@@ -1,3 +1,13 @@
-**/node_modules/*
+**/node_modules/
 **/package-lock.json
 plugin.js
+
+# Hosting & backend (not for public repo)
+.firebase/
+.firebaserc
+firebase.json
+firestore.rules
+firestore.indexes.json
+functions/
+public/
+profilehtml
