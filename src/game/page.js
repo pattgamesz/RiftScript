@@ -5,32 +5,47 @@ import { parseNumber } from '../core/util.js';
 let lastUrl = '';
 
 export function initPageDetector() {
-    // Intercept URL changes
-    const origPush = history.pushState;
-    history.pushState = function() {
-        origPush.apply(history, arguments);
-        detectPage(arguments[2]);
-    };
-    const origReplace = history.replaceState;
-    history.replaceState = function() {
-        origReplace.apply(history, arguments);
-        detectPage(arguments[2]);
-    };
-    // Poll URL for changes Angular routing might not trigger via pushState
-    setInterval(() => {
-        const url = window.location.href;
-        if (url !== lastUrl) {
-            lastUrl = url;
-            detectPage(url);
-        }
-    }, 500);
+    // Inject a script into the page context to intercept Angular's history calls.
+    // This is needed because @grant GM_xmlhttpRequest puts us in a sandbox
+    // where we can't see the page's real history.pushState calls.
+    const script = document.createElement('script');
+    script.textContent = `
+        (function() {
+            const origPush = history.pushState;
+            history.pushState = function() {
+                origPush.apply(history, arguments);
+                window.dispatchEvent(new CustomEvent('riftscript-url', { detail: arguments[2] }));
+            };
+            const origReplace = history.replaceState;
+            history.replaceState = function() {
+                origReplace.apply(history, arguments);
+                window.dispatchEvent(new CustomEvent('riftscript-url', { detail: arguments[2] }));
+            };
+        })();
+    `;
+    document.head.appendChild(script);
+    script.remove();
+
+    // Listen for the custom event from the page context
+    window.addEventListener('riftscript-url', (e) => {
+        if (e.detail) detectPage(e.detail);
+    });
+
+    // Also listen for popstate (back/forward)
+    window.addEventListener('popstate', () => {
+        detectPage(window.location.href);
+    });
+
     // Initial detection
     detectPage(window.location.href);
 }
 
 function detectPage(url) {
     if (!url) return;
+    url = String(url);
+    if (url === lastUrl) return;
     lastUrl = url;
+
     const parts = url.replace(/.*ironwoodrpg\.com/, '').split('/').filter(Boolean);
 
     if (url.includes('/skill/') && url.includes('/action/')) {

@@ -124,13 +124,23 @@ function applyRecipeClickthrough() {
 
 // ─── Init ────────────────────────────────────────────────────
 
+const GAME_PAGES = 'skill-page, equipment-page, home-page, market-page, merchant-page, settings-page, taming-page, profile-page, quests-page, guild-page, adventure-page, challenges-page, leaderboards-page, upgrade-page, traits-page, mastery-page, marks-page, store-page, daily-quest-page, changelog-page';
+
 export function initMenu() {
     applyUIChanges();
     setInterval(injectNavButton, 1000);
+
     events.on('page', (page) => {
-        // Game navigated away — clean up our page
-        if (isOpen && page.type !== 'riftscript') {
-            cleanupPage();
+        // Navigated away — clean up our page (same as Pancake's handlePage)
+        if (page.type !== 'riftscript') {
+            $(PAGE_TAG).remove();
+            $(`#${MENU_ID}`).removeClass('rs-nav-active');
+            $('header-component div.wrapper > div.image').show();
+            // Fix header title — Angular sometimes stops updating it
+            let headerName = page.type;
+            headerName = headerName.charAt(0).toUpperCase() + headerName.slice(1);
+            $('header-component div.wrapper > div.title').text(headerName);
+            isOpen = false;
         }
         if (page.type === 'action' && storage.getData('recipe-clickthrough')) {
             setTimeout(applyRecipeClickthrough, 200);
@@ -139,27 +149,6 @@ export function initMenu() {
     window.addEventListener('riftscript-discord-updated', () => {
         if (isOpen) renderPage();
     });
-
-    // Watch for game pages appearing while our page is open
-    // (e.g. clicking the active skill bar at the bottom)
-    const observer = new MutationObserver(() => {
-        if (isOpen && $('skill-page, equipment-page, home-page, market-page, merchant-page, settings-page, taming-page, profile-page, quests-page, guild-page, adventure-page').length) {
-            cleanupPage();
-        }
-    });
-    const wrapper = document.querySelector('div.padding > div.wrapper');
-    if (wrapper) {
-        observer.observe(wrapper, { childList: true });
-    } else {
-        // Retry once the wrapper exists
-        const interval = setInterval(() => {
-            const el = document.querySelector('div.padding > div.wrapper');
-            if (el) {
-                observer.observe(el, { childList: true });
-                clearInterval(interval);
-            }
-        }, 1000);
-    }
 }
 
 // ─── Nav Button ──────────────────────────────────────────────
@@ -180,8 +169,8 @@ function injectNavButton() {
         e.preventDefault();
         e.stopPropagation();
         if (isOpen) {
-            // Navigate back to settings to restore normal page
-            navigateToSettings();
+            cleanupPage();
+            triggerAngularNav('settings');
         } else {
             openPage();
         }
@@ -192,27 +181,34 @@ function injectNavButton() {
 
 // ─── Page Lifecycle ──────────────────────────────────────────
 
-function navigateToSettings() {
-    // Click the real settings button to navigate away
-    const settingsBtn = $('nav-component button[routerlink="/settings"]');
-    if (settingsBtn.length) {
-        settingsBtn[0].click();
+function triggerAngularNav(page) {
+    window.history.pushState({}, '', page);
+    window.history.pushState({}, '', page);
+    window.history.back();
+}
+
+async function goToPage(page) {
+    if (page === 'settings') {
+        // Angular won't re-route if already on settings — go elsewhere first
+        triggerAngularNav('merchant');
+        await waitForElement('merchant-page', 3000);
     }
+    triggerAngularNav(page);
 }
 
 async function openPage() {
     isOpen = true;
     activeMenu = 'info';
 
-    // Navigate to settings first to get a clean page structure
-    const settingsBtn = $('nav-component button[routerlink="/settings"]');
-    if (settingsBtn.length) {
-        settingsBtn[0].click();
+    // If a custom page is already open, just remove and re-render
+    if ($(PAGE_TAG).length) {
+        $(PAGE_TAG).remove();
+    } else {
+        // Navigate to settings via Angular, wait for it, then remove it
+        await goToPage('settings');
+        await waitForElement('settings-page', 3000);
+        $('settings-page').remove();
     }
-
-    // Wait for settings page to appear, then replace it
-    await waitForElement('settings-page', 2000);
-    $('settings-page').remove();
 
     // Update header
     $('header-component div.wrapper > div.title').text('RiftScript');
@@ -222,7 +218,7 @@ async function openPage() {
     $('nav-component button').removeClass('active-link');
     $(`#${MENU_ID}`).addClass('rs-nav-active');
 
-    // Push our URL
+    // Push our path
     history.pushState({}, '', 'riftscript');
 
     renderPage();
@@ -272,8 +268,13 @@ function renderPage() {
                             <div class="rs-row"><span>Based on</span><span>ironwood-scripts by Pancake</span></div>
                         </div>
                         <div class="rs-card">
-                            <div class="rs-card-header">Changelog — v1.1.0</div>
+                            <div class="rs-card-header">Changelog</div>
                             <div class="rs-changelog">
+                                <div class="rs-changelog-section">v1.1.1</div>
+                                <ul>
+                                    <li>Fixed minor bugs</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.1.0</div>
                                 <div class="rs-changelog-section">Combat Calculator</div>
                                 <ul>
                                     <li>New Combat Calc tab in the RiftScript menu</li>
