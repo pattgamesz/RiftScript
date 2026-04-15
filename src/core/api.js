@@ -1,12 +1,27 @@
 // Ironwood RPG data API client
-const API_ROOT = 'https://iwrpg.vectordungeon.com';
+import { getAuthToken } from './auth.js';
+import { gmFetch } from './request.js';
+import { getMode } from '../game/mode.js';
 
-async function fetchJSON(path) {
-    const res = await fetch(`${API_ROOT}/${path}`, {
+const API_ROOT = 'https://iwrpg.vectordungeon.com';
+const API_AUTH_ROOT = 'https://api-2.ironwoodrpg.com';
+
+function fetchJSON(path) {
+    return gmFetch(`${API_ROOT}/${path}`, {
         headers: { 'Content-Type': 'application/json' }
     });
-    if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
-    return res.json();
+}
+
+function fetchAuth(path) {
+    const token = getAuthToken();
+    if (!token) throw new Error('No auth token available');
+    return gmFetch(`${API_AUTH_ROOT}/${path}`, {
+        headers: {
+            'Content-Type': 'application/json',
+            'token': token,
+            'is-solo': getMode() === 'singleplayer' ? 'true' : 'false',
+        }
+    });
 }
 
 // Game data endpoints
@@ -29,4 +44,7 @@ export const api = {
     listTraits:          () => fetchJSON('public/list/trait'),
     listSkillSets:       () => fetchJSON('public/list/skillSet'),
     getVersion:          () => fetchJSON('public/settings/version'),
+
+    // Authenticated endpoints (uses intercepted game token)
+    getUser:             () => fetchAuth('getUser'),
 };

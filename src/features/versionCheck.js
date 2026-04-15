@@ -1,4 +1,6 @@
 // Version checker — compares local version with latest deployed version
+import { gmFetchText } from '../core/request.js';
+
 const CURRENT_VERSION = RIFTSCRIPT_VERSION;
 const CHECK_INTERVAL = 1000 * 60 * 30; // Check every 30 minutes
 const INSTALL_URL = 'https://rift-script.web.app/riftscript.user.js';
@@ -12,8 +14,7 @@ export function initVersionCheck() {
 async function check() {
     try {
         // Fetch the deployed script and extract version from the header
-        const res = await fetch(INSTALL_URL + '?_=' + Date.now(), { cache: 'no-store' });
-        const text = await res.text();
+        const text = await gmFetchText(INSTALL_URL + '?_=' + Date.now());
         const match = text.match(/@version\s+([\d.]+)/);
         if (!match) return;
 

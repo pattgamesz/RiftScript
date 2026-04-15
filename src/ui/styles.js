@@ -296,7 +296,7 @@ const CSS = `
 }
 
 /* RiftScript Page */
-#riftscript-page {
+riftscript-page {
     height: 100%;
     overflow-y: auto;
     padding-top: var(--gap, 24px);
@@ -355,7 +355,7 @@ const CSS = `
     color: #fff;
     border-bottom: 1px solid #2a3a50;
 }
-#riftscript-page .rs-row {
+riftscript-page .rs-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -365,7 +365,7 @@ const CSS = `
     border-bottom: 1px solid #2a3a50;
     min-height: var(--row, 56px);
 }
-#riftscript-page .rs-row:last-child {
+riftscript-page .rs-row:last-child {
     border-bottom: none;
 }
 .rs-menu-btn {
@@ -496,5 +496,74 @@ const CSS = `
 }
 .rs-toggle input:checked + .rs-toggle-slider::before {
     transform: translateX(16px);
+}
+
+/* Combat Calculator Inputs */
+.rs-combat-input {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 13px;
+    width: 90px;
+    text-align: right;
+    outline: none;
+}
+.rs-combat-input:focus {
+    border-color: #4a9eff;
+}
+.rs-combat-select {
+    width: auto;
+    min-width: 120px;
+    text-align: left;
+    cursor: pointer;
+}
+.rs-combat-input[type="number"]::-webkit-inner-spin-button,
+.rs-combat-input[type="number"]::-webkit-outer-spin-button {
+    opacity: 0.5;
+}
+.rs-cb-fetched {
+    color: #4a9eff;
+    font-size: 12px;
+    margin-left: 4px;
+    text-align: right;
+}
+.rs-cb-fetched:empty {
+    display: none;
+}
+.rs-cb-alert {
+    background: rgba(248,113,113,0.12);
+    border: 1px solid rgba(248,113,113,0.3);
+    border-radius: 8px;
+    color: #f87171;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+/* Changelog */
+.rs-changelog {
+    padding: 12px 24px 16px;
+    font-size: 0.85em;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.6;
+}
+.rs-changelog-section {
+    color: #4a9eff;
+    font-weight: 600;
+    font-size: 0.95em;
+    margin-top: 12px;
+    margin-bottom: 4px;
+}
+.rs-changelog-section:first-child {
+    margin-top: 0;
+}
+.rs-changelog ul {
+    margin: 0;
+    padding-left: 18px;
+}
+.rs-changelog li {
+    margin-bottom: 2px;
 }
 `;

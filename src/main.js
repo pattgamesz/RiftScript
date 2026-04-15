@@ -1,4 +1,5 @@
 // RiftScript — Ironwood RPG enhancement scripts by Patt
+import { initAuthInterceptor } from './core/auth.js';
 import { loadGameData } from './game/data.js';
 import { initPageDetector } from './game/page.js';
 import { initReaders } from './game/reader.js';
@@ -18,7 +19,10 @@ import { initStyles } from './ui/styles.js';
     initPageDetector();
     initModeDetector();
 
-    await loadGameData();
+    await Promise.all([
+        initAuthInterceptor(),
+        loadGameData(),
+    ]);
 
     initReaders();
     initEstimator();
