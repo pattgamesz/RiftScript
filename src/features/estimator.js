@@ -9,6 +9,7 @@ export function initEstimator() {
     events.on('action-inventory', update);
     events.on('action-active', update);
     events.on('game-estimates', update);
+    events.on('action-set-amount', update);
     events.on('levels', update);
 }
 
@@ -74,6 +75,15 @@ function calculate(skillId, actionId) {
         ingredientGoldPerHour += goldPerHour;
         ingredientDetails.push({ itemId: ing.item, stored, perHour, secondsLeft, sellPrice, goldPerHour });
         if (secondsLeft < finishedSeconds) finishedSeconds = secondsLeft;
+    }
+
+    // --- Set amount limit ---
+    const setAmountData = events.last('action-set-amount');
+    if (setAmountData && setAmountData.skill === skillId && setAmountData.remaining != null && actionsPerHour > 0) {
+        const setAmountSeconds = (setAmountData.remaining / actionsPerHour) * 3600;
+        if (setAmountSeconds < finishedSeconds) {
+            finishedSeconds = setAmountSeconds;
+        }
     }
 
     // --- Profit ---

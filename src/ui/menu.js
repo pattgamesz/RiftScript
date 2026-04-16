@@ -3,7 +3,7 @@ import * as events from '../core/events.js';
 import * as storage from '../core/storage.js';
 import { getMode } from '../game/mode.js';
 import { getDiscordUser, isLinked, openOAuth, unlinkDiscord, setTimer } from '../features/discord.js';
-import { renderCombatCard, bindCombatEvents } from './combatPanel.js';
+import { openCombatSimPage } from './combatSimPage.js';
 
 const MENU_ID = 'riftscript-menu-btn';
 const PAGE_TAG = 'riftscript-page';
@@ -135,11 +135,16 @@ export function initMenu() {
         if (page.type !== 'riftscript') {
             $(PAGE_TAG).remove();
             $(`#${MENU_ID}`).removeClass('rs-nav-active');
-            $('header-component div.wrapper > div.image').show();
-            // Fix header title — Angular sometimes stops updating it
-            let headerName = page.type;
-            headerName = headerName.charAt(0).toUpperCase() + headerName.slice(1);
-            $('header-component div.wrapper > div.title').text(headerName);
+            if (isOpen) {
+                $('header-component div.wrapper > div.image').show();
+                // Fix header title — Angular sometimes stops updating it
+                // But don't override if another custom page is taking over
+                if (page.type !== 'combatsim') {
+                    let headerName = page.type;
+                    headerName = headerName.charAt(0).toUpperCase() + headerName.slice(1);
+                    $('header-component div.wrapper > div.title').text(headerName);
+                }
+            }
             isOpen = false;
         }
         if (page.type === 'action' && storage.getData('recipe-clickthrough')) {
@@ -317,7 +322,15 @@ function renderPage() {
                         </div>
                     ` : ''}
                     ${activeMenu === 'settings' ? renderSettingsCard() : ''}
-                    ${activeMenu === 'combat' ? renderCombatCard() : ''}
+                    ${activeMenu === 'combat' ? `
+                        <div class="rs-card">
+                            <div class="rs-card-header">Combat Simulator</div>
+                            <div class="rs-row">
+                                <span>Full combat sandbox with simulation, loot breakdown, and time to level.</span>
+                                <button class="rs-btn rs-btn-primary" id="rs-open-combatsim">Open Simulator</button>
+                            </div>
+                        </div>
+                    ` : ''}
                     ${activeMenu === 'discord' ? renderDiscordCard() : ''}
                     ${activeMenu === 'prices' ? `
                         <div class="rs-card">
@@ -391,9 +404,10 @@ function renderPage() {
         }
     });
 
-    if (activeMenu === 'combat') {
-        bindCombatEvents(page);
-    }
+    page.find('#rs-open-combatsim').on('click', () => {
+        cleanupPage();
+        openCombatSimPage();
+    });
 
     // Insert into the game's page area (same place settings-page was)
     $('div.padding > div.wrapper > router-outlet').after(page);

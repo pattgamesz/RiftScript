@@ -1,76 +1,160 @@
 // Combat simulation engine for RiftScript
-// Deterministic average-damage model
+// Based on the Ironwood RPG combat simulator spreadsheet
+
+function cyrb128(str) {
+    let h1 = 1779033703, h2 = 3144134277,
+        h3 = 1013904242, h4 = 2773480762;
+    for (let i = 0, k; i < str.length; i++) {
+        k = str.charCodeAt(i);
+        h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+        h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+        h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+        h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+    }
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+    return (h1 ^ h2 ^ h3 ^ h4) >>> 0;
+}
+
+function mulberry32(seed) {
+    return function () {
+        var t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
 
 export function simulate(config) {
-    const pAtk = config.playerAttack || 0;
-    const pSpd = config.playerSpeed || 2.5;
-    const dmg = (config.damagePercent || 0) / 100;
-    const blk = (config.blockPercent || 0) / 100;
-    const acc = (config.accuracy || 90) / 100;
-    const eva = (config.evasion || 0) / 100;
-    const pHp = config.playerHealth || 100;
-    const foodHp = config.foodHp || 0;
+    const simulationTime = (config.simHours || 1) * 3600;
+    const seedString = config.seed || String(Date.now());
+    const isOutskirts = config.isOutskirts || false;
 
-    const mHp = config.monsterHealth || 100;
-    const mAtk = config.monsterAttack || 0;
-    const mSpd = config.monsterSpeed || 2.0;
-    const mDmg = (config.monsterDamage || 0) / 100;
-    const mBlk = (config.monsterBlock || 0) / 100;
+    const seed = cyrb128(seedString);
+    const prng = mulberry32(seed);
 
-    const eff = (config.efficiency || 0) / 100;
+    const player = {
+        maxHealth: config.playerHealth || 100,
+        currentHealth: config.playerHealth || 100,
+        attack: config.playerAttack || 0,
+        attackDelay: config.playerSpeed || 2.5,
+        damageIncrease: (config.damagePercent || 0) / 100,
+        damageReduction: (config.blockPercent || 0) / 100,
+        healAmount: config.foodHp || 0,
+        accuracy: (config.accuracy || 90) / 100,
+        evasion: (config.evasion || 0) / 100,
+    };
 
-    const playerDmgPerHit = pAtk * (1 + dmg) * acc * (1 - mBlk);
-    const monsterDmgPerHit = mAtk * (1 + mDmg) * (1 - blk) * (1 - eva);
+    const monster = {
+        maxHealth: config.monsterHealth || 100,
+        currentHealth: config.monsterHealth || 100,
+        attack: config.monsterAttack || 0,
+        attackDelay: config.monsterSpeed || 2.0,
+        damageIncrease: (config.monsterDamage || 0) / 100,
+        damageReduction: (config.monsterBlock || 0) / 100,
+    };
 
-    if (playerDmgPerHit <= 0) {
-        return { baseKPH: 0, finalKPH: 0, foodPerHour: 0, canSurvive: true, timePerKill: Infinity };
-    }
+    const regionAdvantage = config.regionAdvantage || 1;
+    const reviveSpeed = config.reviveSpeed || 900;
+    const outskirtsDelay = config.outskirtsDelay || 1200;
 
-    // Simulate one kill using turn-based timing
-    let hp = pHp;
-    let monsterHp = mHp;
-    let time = 0;
-    let pNext = pSpd;
-    let mNext = mSpd;
-    let heals = 0;
-    const healThreshold = monsterDmgPerHit > 0 ? monsterDmgPerHit * 2 : 0;
+    const timeStep = 0.5;
+    const HEAL_THRESHOLD = player.maxHealth * 0.33;
+    const HEAL_COOLDOWN_DURATION = 15;
+    const MONSTER_RESPAWN_PAUSE = 1;
 
-    while (monsterHp > 0 && time < 600) {
-        if (pNext <= mNext) {
-            time = pNext;
-            if (foodHp > 0 && hp <= healThreshold && monsterHp > playerDmgPerHit * 0.5) {
-                hp = Math.min(hp + foodHp, pHp);
-                heals++;
-            } else {
-                monsterHp -= playerDmgPerHit;
+    let currentTime = 0;
+    let playerAttackTimer = player.attackDelay;
+    let monsterAttackTimer = monster.attackDelay;
+    let playerHealCooldown = 0;
+
+    let monstersDefeated = 0;
+    let playerDefeats = 0;
+    let healsUsed = 0;
+
+    while (currentTime < simulationTime) {
+        // Player attacks
+        if (playerAttackTimer <= 0) {
+            if (prng() < player.accuracy) {
+                const baseDamage = player.attack * (1 + player.damageIncrease) * (1 - monster.damageReduction);
+                const randomMultiplier = prng() * 0.25 + 0.75;
+                const actualDamage = baseDamage * randomMultiplier * regionAdvantage;
+                monster.currentHealth -= actualDamage;
             }
-            pNext += pSpd;
-        } else {
-            time = mNext;
-            hp -= monsterDmgPerHit;
-            if (hp <= 0) {
-                return { baseKPH: 0, finalKPH: 0, foodPerHour: 0, canSurvive: false, timePerKill: Infinity };
-            }
-            mNext += mSpd;
+            playerAttackTimer = player.attackDelay;
         }
+
+        // Monster attacks
+        if (monsterAttackTimer <= 0) {
+            if (prng() >= player.evasion) {
+                const baseDamage = monster.attack * (1 + monster.damageIncrease) * (1 - player.damageReduction);
+                const randomMultiplier = prng() * 0.25 + 0.75;
+                const actualDamage = baseDamage * randomMultiplier;
+                player.currentHealth -= actualDamage;
+            }
+            monsterAttackTimer = monster.attackDelay;
+        }
+
+        // Healing (disabled in Outskirts)
+        if (!isOutskirts && player.currentHealth < HEAL_THRESHOLD && playerHealCooldown <= 0 && player.healAmount > 0) {
+            player.currentHealth = Math.min(player.maxHealth, player.currentHealth + player.healAmount);
+            healsUsed++;
+            playerHealCooldown = HEAL_COOLDOWN_DURATION;
+        }
+
+        // Monster defeated
+        if (monster.currentHealth <= 0) {
+            monstersDefeated++;
+            currentTime += MONSTER_RESPAWN_PAUSE;
+
+            if (isOutskirts) {
+                currentTime += outskirtsDelay;
+                player.currentHealth = player.maxHealth;
+            }
+
+            monster.currentHealth = monster.maxHealth;
+            monsterAttackTimer = monster.attackDelay;
+            playerAttackTimer = player.attackDelay;
+        }
+
+        // Player defeated
+        if (player.currentHealth <= 0) {
+            playerDefeats++;
+            currentTime += reviveSpeed;
+
+            if (isOutskirts) {
+                currentTime += outskirtsDelay;
+            }
+
+            if (currentTime >= simulationTime) break;
+
+            player.currentHealth = player.maxHealth;
+            monster.currentHealth = monster.maxHealth;
+            playerAttackTimer = player.attackDelay;
+            monsterAttackTimer = monster.attackDelay;
+        }
+
+        // Advance time
+        currentTime += timeStep;
+        if (playerAttackTimer > 0) playerAttackTimer -= timeStep;
+        if (monsterAttackTimer > 0) monsterAttackTimer -= timeStep;
+        if (playerHealCooldown > 0) playerHealCooldown -= timeStep;
     }
 
-    if (time >= 600) {
-        return { baseKPH: 0, finalKPH: 0, foodPerHour: 0, canSurvive: true, timePerKill: Infinity };
-    }
-
-    const timePerKill = time;
-    const baseKPH = 3600 / timePerKill;
-    const finalKPH = baseKPH * (1 + eff);
-    // Food only consumed during actual fights, not efficiency bonus kills
-    const foodPerHour = heals * baseKPH;
+    const hours = simulationTime / 3600;
+    const baseKPH = monstersDefeated / hours;
+    const finalKPH = baseKPH * (1 + (config.efficiency || 0) / 100);
+    const foodPerHour = healsUsed / hours;
 
     return {
+        monstersDefeated,
+        playerDefeats,
+        healsUsed,
         baseKPH,
         finalKPH,
         foodPerHour,
-        timePerKill,
-        healsPerKill: heals,
         canSurvive: true,
     };
 }

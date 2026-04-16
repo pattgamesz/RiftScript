@@ -18,6 +18,7 @@ function readAll() {
         readActionExp(page.skill);
         readActionInventory();
         readActionEstimates(page.skill);
+        readSetAmount(page.skill);
         const isActive = $('skill-page .action-stop').length > 0;
         events.emit('action-active', isActive);
     }
@@ -68,6 +69,19 @@ function readActionInventory() {
             extractItem($el, inventory);
         });
     events.emit('action-inventory', inventory);
+}
+
+// Read the set amount from the Loot header (e.g. "1,177 / 2,734")
+function readSetAmount(skillId) {
+    const amountText = $('skill-page .header > .name:contains("Loot")').parent().find('.amount').text();
+    if (!amountText || !amountText.includes('/')) {
+        events.emit('action-set-amount', { skill: skillId, remaining: null });
+        return;
+    }
+    const done = parseNumber(amountText.split('/')[0]);
+    const total = parseNumber(amountText.split('/')[1]);
+    const remaining = total - done;
+    events.emit('action-set-amount', { skill: skillId, remaining: remaining > 0 ? remaining : null });
 }
 
 // Read the game's own Stats/Estimates values

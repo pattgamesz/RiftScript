@@ -49,6 +49,9 @@ const DEFAULT_CONFIG = {
     baseXpPerKill: 2.6,
     lootValuePerKill: 730,
     otherCostPerHour: 0,
+    simHours: 1,
+    regionAdvantage: 1,
+    reviveSpeed: 900,
 };
 
 function loadConfig() {
@@ -85,6 +88,9 @@ function getConfig(page) {
         baseXpPerKill: val('rs-cb-baseXp'),
         lootValuePerKill: val('rs-cb-lootVal'),
         otherCostPerHour: val('rs-cb-otherCost'),
+        simHours: val('rs-cb-simHours') || 1,
+        regionAdvantage: val('rs-cb-regionAdv') || 1,
+        reviveSpeed: val('rs-cb-revive') || 900,
     };
 }
 
@@ -116,6 +122,9 @@ function recalculate(page) {
         <div class="rs-row"><span>Base Kills/Hr</span><span>${fmt(sim.baseKPH)}</span></div>
         <div class="rs-row"><span>Final Kills/Hr</span><span style="color:#4a9eff;font-weight:600">${fmt(sim.finalKPH)}</span></div>
         <div class="rs-row"><span>Food/Hr</span><span>${fmt(sim.foodPerHour)}</span></div>
+        ${sim.playerDefeats > 0 ? `
+            <div class="rs-row"><span>Deaths</span><span style="color:#f87171">${sim.playerDefeats}</span></div>
+        ` : ''}
         <div class="rs-row"><span>XP/Hr</span><span>${fmt(results.xpPerHour)}</span></div>
         <div class="rs-divider"></div>
         <div class="rs-row"><span>Loot/Hr</span><span>${fmt(results.lootPerHour)}</span></div>
@@ -188,6 +197,13 @@ export function renderCombatCard() {
             <div class="rs-card-header">XP & Loot</div>
             ${inputRow('Base XP/Kill', 'rs-cb-baseXp', c.baseXpPerKill, 0.1)}
             ${inputRow('Loot Value/Kill', 'rs-cb-lootVal', c.lootValuePerKill, 1, 'gold')}
+        </div>
+
+        <div class="rs-card">
+            <div class="rs-card-header">Simulation</div>
+            ${inputRow('Sim Duration', 'rs-cb-simHours', c.simHours || 1, 1, 'hours')}
+            ${inputRow('Region Advantage', 'rs-cb-regionAdv', c.regionAdvantage || 1, 0.1, 'x')}
+            ${inputRow('Revive Time', 'rs-cb-revive', c.reviveSpeed || 900, 1, 'sec')}
         </div>
 
         <div class="rs-card">
