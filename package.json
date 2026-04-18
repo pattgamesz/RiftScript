@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build.js",
     "watch": "node build.js --watch",
-    "deploy": "node build.js && npx firebase deploy --only hosting"
+    "deploy": "node build.js && npx firebase deploy --only hosting",
+    "deploy:dev": "node build.js && npx firebase hosting:channel:deploy dev"
   },
   "devDependencies": {
     "esbuild": "^0.21.0"
