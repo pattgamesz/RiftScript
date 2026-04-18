@@ -6,7 +6,7 @@ export function initStyles() {
 }
 
 const CSS = `
-/* Divider — matches game's .divider style */
+/* Divider \u2014 matches game's .divider style */
 .rs-divider {
     margin-top: var(--gap, 8px);
     border-top: 1px dashed rgba(255,255,255,0.1);
@@ -21,7 +21,7 @@ const CSS = `
     overflow: hidden;
 }
 
-/* Tabs — mirrors game's .tabs > button.tab pattern */
+/* Tabs \u2014 mirrors game's .tabs > button.tab pattern */
 .rs-tabs {
     display: flex;
     border-bottom: 1px solid rgba(255,255,255,0.08);
@@ -241,7 +241,7 @@ const CSS = `
     letter-spacing: 0.3px;
 }
 
-/* Nav Button — matches game button spacing */
+/* Nav Button \u2014 matches game button spacing */
 .riftscript-nav-btn {
     all: unset;
     display: flex;
@@ -567,7 +567,7 @@ riftscript-page .rs-row:last-child {
     margin-bottom: 2px;
 }
 
-/* ─── Combat Simulator Page ─────────────────────────────────── */
+/* \u2500\u2500\u2500 Combat Simulator Page \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 
 combatsim-page {
     display: block;
@@ -728,7 +728,7 @@ combatsim-page {
 
 /* Monster List */
 .cs-monster-list {
-    max-height: 350px;
+    max-height: none;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.15) transparent;
@@ -846,7 +846,7 @@ combatsim-page {
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-/* Stat grid — 2 columns inside player/monster cards */
+/* Stat grid \u2014 2 columns inside player/monster cards */
 .cs-stat-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -921,7 +921,7 @@ combatsim-page {
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-/* Control grid — single column */
+/* Control grid \u2014 single column */
 .cs-control-grid {
     display: flex;
     flex-direction: column;
@@ -1076,5 +1076,202 @@ combatsim-page {
 .cs-skill-xp {
     font-size: 0.75em;
     color: rgba(255,255,255,0.4);
+}
+
+/* \u2500\u2500\u2500 Combat Simulator Expanded Sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+
+/* Modifier Breakdown Card */
+.cs-breakdown { padding: 12px 16px; }
+.cs-breakdown-total { display: flex; justify-content: space-between; font-weight: 600; font-size: 0.95em; color: #fff; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; }
+.cs-breakdown-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 0.8em; color: rgba(255,255,255,0.5); }
+.cs-breakdown-row span:last-child { color: rgba(255,255,255,0.7); }
+
+/* Section Dividers within cards */
+.cs-section-label { padding: 10px 16px 4px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.3); font-weight: 600; }
+
+/* Toggle rows (tomes, relics, guild event, etc.) */
+.cs-toggle-row { display: flex; align-items: center; padding: 6px 16px; font-size: 0.85em; color: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.cs-toggle-row > span:first-child { flex: 1; }
+.cs-toggle-row label { display: flex; align-items: center; cursor: pointer; margin-right: 10px; }
+.cs-toggle-row input[type="checkbox"] { accent-color: #4a9eff; width: 16px; height: 16px; }
+
+/* Consumable cost summary */
+.cs-cost-row { display: flex; justify-content: space-between; padding: 6px 16px; font-size: 0.85em; color: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.cs-cost-row span:last-child { color: #f87171; }
+.cs-cost-total { display: flex; justify-content: space-between; padding: 8px 16px; font-size: 0.9em; font-weight: 600; color: #fff; border-top: 1px solid rgba(255,255,255,0.1); }
+.cs-cost-total span:last-child { color: #f87171; }
+
+/* Guild settings inputs (compact grid) */
+.cs-guild-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.cs-guild-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; font-size: 0.85em; color: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); }
+.cs-guild-row:nth-child(even) { border-right: none; }
+
+/* Potion/Brew selector row */
+.cs-consumable-select-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; font-size: 0.85em; color: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+/* Info tooltip / helper text */
+.cs-info-text { padding: 8px 16px; font-size: 0.75em; color: rgba(255,255,255,0.3); line-height: 1.4; }
+
+/* Compact input (smaller than cs-input, for guild levels etc.) */
+.cs-input-sm { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: #fff; padding: 3px 6px; font-size: 11px; width: 50px; text-align: right; outline: none; }
+.cs-input-sm:focus { border-color: #4a9eff; }
+
+/* \u2500\u2500\u2500 Equipment Selector Card \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+
+.cs-equip-card {
+    background: #172033;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.cs-equip-slot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px;
+    font-size: 0.85em;
+    color: rgba(255,255,255,0.7);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.cs-equip-slot-label {
+    width: 60px;
+    flex-shrink: 0;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.35);
+    font-weight: 600;
+}
+.cs-equip-slot-img {
+    width: 24px;
+    height: 24px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.04);
+}
+.cs-equip-slot-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+    font-size: 0.9em;
+}
+.cs-equip-slot-empty {
+    flex: 1;
+    color: rgba(255,255,255,0.25);
+    font-style: italic;
+    font-size: 0.85em;
+}
+.cs-equip-select {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: #fff;
+    padding: 3px 6px;
+    font-size: 11px;
+    max-width: 180px;
+    min-width: 120px;
+    outline: none;
+    cursor: pointer;
+}
+.cs-equip-select:focus {
+    border-color: #4a9eff;
+}
+.cs-equip-select option {
+    background: #1a1a2e;
+    color: #fff;
+}
+.cs-equip-select optgroup {
+    background: #1a1a2e;
+    color: rgba(255,255,255,0.5);
+    font-style: normal;
+    font-weight: 600;
+}
+
+.cs-equip-summary {
+    padding: 10px 16px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.cs-equip-summary-title {
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.35);
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.cs-equip-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 12px;
+}
+.cs-equip-stat {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8em;
+    padding: 2px 0;
+}
+.cs-equip-stat-label {
+    color: rgba(255,255,255,0.5);
+}
+.cs-equip-stat-value {
+    color: #4ade80;
+    font-weight: 500;
+}
+.cs-equip-stat-value.zero {
+    color: rgba(255,255,255,0.2);
+}
+
+/* Setup Tabs (Equipment/Modifiers/Consumables) */
+/* Equipment grid \u2014 2 columns like the game */
+.cs-equip-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+.cs-equip-grid .cs-equip-slot {
+    border-right: 1px solid rgba(255,255,255,0.05);
+}
+.cs-equip-grid .cs-equip-slot:nth-child(even) {
+    border-right: none;
+}
+
+.cs-setup-tabs {
+    display: flex;
+    border-bottom: 1px solid #2a3a50;
+}
+.cs-setup-tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.5);
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 0.9em;
+    font-weight: 600;
+    background: none;
+}
+.cs-setup-tab:hover {
+    color: rgba(255,255,255,0.7);
+}
+.cs-setup-tab.active {
+    color: #fff;
+    border-bottom-color: #4a9eff;
+    background: rgba(74,158,255,0.05);
+}
+.cs-tab-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.cs-credit {
+    text-align: center;
+    padding: 12px 24px 24px;
+    font-size: 0.75em;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.3px;
 }
 `;

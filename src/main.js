@@ -8,7 +8,7 @@ import { initEstimator } from './features/estimator.js';
 import { initVersionCheck } from './features/versionCheck.js';
 import { initEstimatorPanel } from './ui/estimatorPanel.js';
 import { initMenu } from './ui/menu.js';
-// import { initCombatSimPage } from './ui/combatSimPage.js'; // Hidden until complete
+import { initCombatSimPage } from './ui/combatSimPage.js';
 import { initStyles } from './ui/styles.js';
 
 (async function RiftScript() {
@@ -30,7 +30,7 @@ import { initStyles } from './ui/styles.js';
     initVersionCheck();
     initEstimatorPanel();
     initMenu();
-    // initCombatSimPage(); // Hidden until complete
+    initCombatSimPage();
 
     console.log('[RiftScript] Ready.');
 })();
