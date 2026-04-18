@@ -75,7 +75,7 @@ let BREW_TYPES = [
   ];
 export function initCombatSimPage() {
     setInterval(injectNavButton, 1e3);
-    on("page", (page) => {
+    events.on("page", (page) => {
       if (page.type !== "combatsim") {
         $(PAGE_TAG).remove();
         $(`#${NAV_ID}`).removeClass("rs-nav-active");
@@ -353,12 +353,12 @@ export function populateEquipmentFromUser(userData) {
     }
   }
 export function saveEquipmentConfig() {
-    const c = getData("combatsim-config") || {};
+    const c = storage.getData("combatsim-config") || {};
     c.equipment = { ...selectedEquipment };
-    save("combatsim-config", c);
+    storage.save("combatsim-config", c);
   }
 export function loadEquipmentConfig() {
-    const c = getData("combatsim-config") || {};
+    const c = storage.getData("combatsim-config") || {};
     if (c.equipment) {
       selectedEquipment = { ...c.equipment };
     }
@@ -413,7 +413,7 @@ export function getMonsterBlockPercent(monster) {
 export function getLootValuePerKill(actionId) {
     if (!actionId || !data.drops.byAction[actionId]) return 0;
     const drops = data.drops.byAction[actionId];
-    const customPrices2 = getData("custom-prices") || {};
+    const customPrices2 = storage.getData("custom-prices") || {};
     let total = 0;
     for (const drop of drops) {
       const item = data.items.byId[drop.item];
@@ -429,7 +429,7 @@ export function getLootValuePerKill(actionId) {
 export function getLootBreakdown(actionId, killsPerHour) {
     if (!actionId || !data.drops.byAction[actionId]) return [];
     const drops = data.drops.byAction[actionId];
-    const customPrices2 = getData("custom-prices") || {};
+    const customPrices2 = storage.getData("custom-prices") || {};
     const breakdown = [];
     for (const drop of drops) {
       const item = data.items.byId[drop.item];
@@ -459,7 +459,7 @@ export function getLootBreakdown(actionId, killsPerHour) {
   }
 export function renderPage() {
     $(PAGE_TAG).remove();
-    const c = getData("combatsim-config") || {};
+    const c = storage.getData("combatsim-config") || {};
     const foodOptions = FOOD_TYPES.map(
       (f) => `<option value="${f.name}" ${(c.foodType || "None") === f.name ? "selected" : ""}>${f.name}${f.hp ? ` (${f.hp} HP)` : ""}</option>`
     ).join("");
@@ -1291,7 +1291,7 @@ export function runSimulation(page) {
       setTimeout(() => page.find("#cs-alert").fadeOut(), 3e3);
       return;
     }
-    save("combatsim-config", {
+    storage.save("combatsim-config", {
       equipment: { ...selectedEquipment },
       foodType: config.foodType,
       simHours: config.simHours,
