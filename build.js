@@ -3,9 +3,11 @@ import fs from 'fs';
 
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const VERSION = pkg.version;
+const isDev = process.argv.includes('--dev');
+const LABEL = isDev ? ' [DEV]' : '';
 
 const HEADER = `// ==UserScript==
-// @name         Ironwood RPG - RiftScript
+// @name         Ironwood RPG - RiftScript${LABEL}
 // @namespace    https://rift-guild.com
 // @version      ${VERSION}
 // @description  Ironwood RPG enhancement scripts by Patt
@@ -43,6 +45,7 @@ const config = {
     banner: { js: HEADER },
     define: {
         'RIFTSCRIPT_VERSION': JSON.stringify(VERSION),
+        'RIFTSCRIPT_DEV': JSON.stringify(isDev),
     },
     logLevel: 'info',
 };

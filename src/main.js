@@ -14,7 +14,7 @@ import { initStyles } from './ui/styles.js';
 (async function RiftScript() {
     'use strict';
 
-    console.log(`[RiftScript] Starting v${RIFTSCRIPT_VERSION}...`);
+    console.log(`[RiftScript] Starting v${RIFTSCRIPT_VERSION}${RIFTSCRIPT_DEV ? ' [DEV]' : ''}...`);
 
     initStyles();
     initPageDetector();

@@ -166,7 +166,7 @@ function injectNavButton() {
     const btn = $(`
         <button id="${MENU_ID}" type="button" class="riftscript-nav-btn">
             <div class="riftscript-nav-logo">RS</div>
-            <div class="name">RiftScript</div>
+            <div class="name">RiftScript${RIFTSCRIPT_DEV ? ' <span style="color:#f59e0b;font-size:0.7em">DEV</span>' : ''}</div>
         </button>
     `);
 
@@ -266,7 +266,7 @@ function renderPage() {
                     ${activeMenu === 'info' ? `
                         <div class="rs-card">
                             <div class="rs-card-header">RiftScript</div>
-                            <div class="rs-row"><span>Version</span><span>${RIFTSCRIPT_VERSION}</span></div>
+                            <div class="rs-row"><span>Version</span><span>${RIFTSCRIPT_VERSION}${RIFTSCRIPT_DEV ? ' [DEV]' : ''}</span></div>
                             <div class="rs-row"><span>Game Mode</span><span>${modeLabel}</span></div>
                             <div class="rs-row"><span>Made by</span><span>Patt</span></div>
                             <div class="rs-row"><span>Website</span><span><a href="https://rift-guild.com" target="_blank" style="color:#4a9eff;text-decoration:none">rift-guild.com</a></span></div>
