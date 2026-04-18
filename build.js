@@ -8,7 +8,7 @@ const LABEL = isDev ? ' [DEV]' : '';
 
 const HEADER = `// ==UserScript==
 // @name         Ironwood RPG - RiftScript${LABEL}
-// @namespace    https://rift-guild.com
+// @namespace    ${isDev ? 'https://rift-guild.com/dev' : 'https://rift-guild.com'}
 // @version      ${VERSION}
 // @description  Ironwood RPG enhancement scripts by Patt
 // @author       Patt
