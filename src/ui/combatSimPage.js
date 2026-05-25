@@ -875,6 +875,10 @@ function renderPage() {
                         <div class="cs-card-header"><span>Simulation</span></div>
                         <div class="cs-control-grid">
                             ${controlInput("Duration", "cs-simHours", c.simHours || 1, 1, "hours")}
+                            <div class="cs-control-row">
+                                <span>Seed</span>
+                                <input class="cs-input" id="cs-seed" type="text" value="${c.seed || 'RiftScript'}" placeholder="any text" title="Same seed → same dice rolls. Change to re-roll.">
+                            </div>
                             ${controlInput("Efficiency", "cs-eff", c.efficiency || 0, 0.01, "%")}
                             ${controlInput("Loot Bonus", "cs-loot", c.lootBonus || 0, 0.01, "%")}
                             ${controlInput("XP Bonus", "cs-xp", c.xpBonus || 0, 0.01, "%")}
@@ -1195,9 +1199,14 @@ async function fetchStats(page) {
     }
   }
 function setFetched(page, id, value) {
-    page.find(`#${id}`).val(value);
+    // Always update the "fetched" display so the user can see the latest
+    // API/equipment value. Only auto-fill the input when it's empty/zero —
+    // a manual override stays put across equipment changes.
     page.find(`#${id}-fetched`).text(value);
-  }
+    const $input = page.find(`#${id}`);
+    const current = parseFloat($input.val());
+    if (!current) $input.val(value);
+}
 function buildSimConfig(page) {
     const val = (id) => parseFloat(page.find(`#${id}`).val()) || 0;
     const foodName = page.find("#cs-food").val();
@@ -1313,6 +1322,7 @@ function buildSimConfig(page) {
       lootValuePerKill: lootVal,
       otherCostPerHour: 0,
       simHours: val("cs-simHours") || 1,
+      seed: page.find("#cs-seed").val() || "RiftScript",
       regionAdvantage: val("cs-regionAdv") || 1,
       reviveSpeed: val("cs-revive") || 900,
       ttlStart: val("cs-ttl-start"),
@@ -1433,6 +1443,7 @@ function runSimulation(page) {
       equipment: { ...selectedEquipment },
       foodType: config.foodType,
       simHours: config.simHours,
+      seed: config.seed,
       efficiency: config.efficiency,
       lootBonus: config.lootBonus,
       xpBonus: config.xpBonus,

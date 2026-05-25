@@ -328,7 +328,18 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.4.0</div>
+                                <div class="rs-changelog-section">v1.4.1 – v1.4.4 — Combat Simulator overhaul</div>
+                                <ul>
+                                    <li><b>Bug fixes</b>: XP/hr and Loot/hr now include every modifier shown in the breakdown panels (potion, brew, relic, trait, mark, guild, masteries) — previously only the equipment chip values were applied.</li>
+                                    <li><b>Outskirts fix</b>: kills/hr no longer double-applies efficiency when grinding Outskirts content.</li>
+                                    <li><b>Potion/Brew fix</b>: the +XP / +Loot effect from your selected potion/brew is now actually used in the math (was silently 0).</li>
+                                    <li><b>Sheet-conformant formulas</b>: full port of Rivea's Tiers / Sigils / MapMods / Potions / Brews tables. Potion bonuses now scale correctly with Potent mastery, Wisdom Tome, and Potent Relic stacking.</li>
+                                    <li><b>New Modifiers tab cards</b>: Masteries (Potent / Savage / Insatiable / Coin / Double XP / Lantern tier + Runic level), Sigil selector, Active Map (mod type + tier + state), Relic Effects (doublers for Potent/Savage/Insatiable + Outskirts XP relic).</li>
+                                    <li><b>Insatiable XP procs</b> toggle (+50% XP per kill when active).</li>
+                                    <li><b>Seed input</b> for deterministic, reproducible runs — same seed → same dice rolls.</li>
+                                    <li>Equipment-derived efficiency / loot / XP fields no longer overwrite your manual edits when you change equipment.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.4.0</div>
                                 <ul>
                                     <li><b>Pet Manager</b> on the Taming page — inline H/A/D + passive chips on every pet (click once to cache), best-in-family ★ marker, exact duplicate detection, "Only perfect stats" filter, family + sort options</li>
                                     <li><b>Expedition Calculator</b> tab in the Pet Manager — per-tier success chance, drops, food cost, egg chance, EXP per run; weekly rotation auto-detected; plan ahead for next week / in 2 weeks</li>
