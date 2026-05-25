@@ -329,7 +329,15 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.5.0 — Combat Simulator: complete Rivea sheet port</div>
+                                <div class="rs-changelog-section">v1.5.1 – v1.5.3 — Pet panel polish + feedback link</div>
+                                <ul>
+                                    <li><b>Expedition Calculator data persists across taming sub-tabs</b> — switching to the in-game Expedition / Breeding sub-tab no longer wipes the team. The reader now detects which sub-tab you're on and only treats the Pets sub-tab DOM as authoritative; other sub-tabs re-use the last good scrape.</li>
+                                    <li>Team membership is now cached in localStorage so the expedition calc has data even after a hard refresh on the Expedition sub-tab.</li>
+                                    <li>Pet panel re-injects itself when Angular swaps sub-tab content, and its tab/form handlers use document delegation so they survive every re-render.</li>
+                                    <li><b>Feedback link</b> added to the Info card — share what works, what doesn't, and what you'd like next at <a href="https://rift-guild.com/riftscript/" target="_blank" style="color:#4a9eff;text-decoration:none">rift-guild.com/riftscript</a>.</li>
+                                    <li>Console cleanup — dropped chatty startup logs; only warnings and errors remain so real issues still surface.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.5.0 — Combat Simulator: complete Rivea sheet port</div>
                                 <ul>
                                     <li><b>Combat Sim now mirrors the entire Rivea spreadsheet</b> — every named range that affects XP/loot/profit is wired up. Mark variants (Primary/Defense/FullSet/RegionSet), Trait set bonuses, Runic Tome chain, Eff Skill Rune, Adventure Profit per-item rates, and 14 relic-effect toggles.</li>
                                     <li><b>Three earlier-broken masteries now actually work</b>: Coin Drop (loot value), Double XP (XP/hr), Lantern (key cost reduction).</li>
