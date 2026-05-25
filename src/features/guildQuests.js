@@ -19,9 +19,9 @@ export function clearGuildCache() {
     guildCacheTime = 0;
 }
 
-export async function getQuests() {
+export async function getQuests({ force = false } = {}) {
     if (getMode() !== 'multiplayer') return null;
-    const guild = await getGuildData();
+    const guild = await getGuildData(force);
     if (!guild) return null;
     const quests = extractOpenQuests(guild);
     const resetRaw = guild?.quests?.reset;
@@ -64,11 +64,11 @@ export function formatTimeRemaining(ms) {
     return `${m}m`;
 }
 
-async function getGuildData() {
+async function getGuildData(force = false) {
     if (!hasAuth()) return null;
     const now = Date.now();
-    if (guildCache && now - guildCacheTime < CACHE_TTL_MS) return guildCache;
-    if (now < backoffUntil) return guildCache;
+    if (!force && guildCache && now - guildCacheTime < CACHE_TTL_MS) return guildCache;
+    if (!force && now < backoffUntil) return guildCache;
     if (inFlight) return inFlight;
     inFlight = (async () => {
         try {

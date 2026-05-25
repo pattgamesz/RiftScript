@@ -302,6 +302,10 @@ function renderPanel() {
     $panel.find('.rs-mp-tab').on('click', function() {
         activeTab = $(this).data('tab');
         renderPanel();
+        // Opening the Guild tab triggers a fresh getGuild fetch — the in-game
+        // quest progress can change at any moment, so showing 5-minute-old
+        // cached numbers would be misleading right before a purchase.
+        if (activeTab === 'guild') loadQuestsAndRender({ force: true });
     });
 }
 
@@ -370,15 +374,22 @@ function renderSavedTab() {
 }
 
 function renderGuildTab() {
+    // Reminder: contribution data is only refreshed when the game's own guild
+    // page is opened (or when this tab is opened — that also forces a fetch).
+    // Tell users so they don't buy stuff against stale "left" amounts.
+    const notice = `<div class="rs-mp-hint-row" style="font-style:normal;color:#fbbf24">
+        Tip: open the in-game <b>Guild → Quests</b> page once before buying,
+        so this list reflects the latest contributions.
+    </div>`;
     if (!questCache) {
-        return `<div class="rs-mp-empty">Loading guild quests…</div>`;
+        return `${notice}<div class="rs-mp-empty">Loading guild quests…</div>`;
     }
     const { quests, effectiveResetAt } = questCache;
     const timerHtml = effectiveResetAt
         ? `<div class="rs-mp-hint-row" style="font-style:normal">Resets in <span style="color:#fbbf24;font-weight:600">${escapeHtml(formatTimeRemaining(effectiveResetAt - Date.now()))}</span></div>`
         : '';
     if (!quests.length) {
-        return `${timerHtml}<div class="rs-mp-empty">No open guild quests right now.</div>`;
+        return `${notice}${timerHtml}<div class="rs-mp-empty">No open guild quests right now.</div>`;
     }
     const rows = quests.map(q => {
         const remaining = Math.max(0, (q.amount || 0) - (q.contributed || 0));
@@ -390,11 +401,11 @@ function renderGuildTab() {
             </button>
         `;
     }).join('');
-    return `${timerHtml}<div class="rs-gq-list">${rows}</div>`;
+    return `${notice}${timerHtml}<div class="rs-gq-list">${rows}</div>`;
 }
 
-async function loadQuestsAndRender() {
-    const result = await getGuildQuests();
+async function loadQuestsAndRender({ force = false } = {}) {
+    const result = await getGuildQuests({ force });
     if (!result) return;
     // The server's reset time-of-day is constant; compute the next occurrence
     // locally so the countdown is always accurate regardless of API lag.
