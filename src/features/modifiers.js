@@ -204,14 +204,20 @@ export function calculateXpModifiers(config) {
     // Insatiable XP procs (sheet BH74): when active, XP per kill × 1.5 → +50%.
     const insatiableXp = config.insatiableXpActive ? 50 : 0;
 
+    // Double XP mastery (sheet sDoubleXPMod = BE79): tier-based, plus Vendor
+    // Gems +2%. Mastery already includes Vendor Gems via calculateMasteryMods.
+    const doubleXPMastery = mastery.doubleXP * 100;
+
     const total = potion + brew + sigilXp + savage + activeSkill + bracelet
                 + mapXP + relicDoubleXP + trait + mark + weapon + skillXpBonus
-                + adventureXp + contractXp + outskirtsXp + insatiableXp;
+                + adventureXp + contractXp + outskirtsXp + insatiableXp
+                + doubleXPMastery;
 
     return {
         potion, brew, sigilXp, savage, activeSkill, bracelet, mapXP,
         relicDoubleXP, trait, mark, weapon, skillXpBonus,
         adventureXp, contractXp, outskirtsXp, insatiableXp,
+        doubleXPMastery,
         total,
     };
 }
@@ -245,8 +251,12 @@ export function calculateLootModifiers(config) {
     const trait = config.traitLoot || 0;
     const adventureLoot = config.adventureMode === 't10loot' ? (config.adventureEffect || 0) : 0;
 
-    const total = potion + brew + mapLoot + amulet + trait + adventureLoot;
-    return { amulet, potion, brew, mapLoot, trait, adventureLoot, total };
+    // Coin Drop mastery (sheet sCoinMod = AY75): tier-based, plus Vendor Gems +2%.
+    // Treated as a loot bonus because every drop in Ironwood has gold value.
+    const coinMastery = mastery.coin * 100;
+
+    const total = potion + brew + mapLoot + amulet + trait + adventureLoot + coinMastery;
+    return { amulet, potion, brew, mapLoot, trait, adventureLoot, coinMastery, total };
 }
 
 // ─── Damage / block (unchanged from Phase 1) ───────────────
@@ -278,6 +288,8 @@ export function calculateDamageBlock(config) {
 // ─── Consumable costs (unchanged from Phase 1) ─────────────
 
 export function calculateConsumableCosts(config, killsPerHour, foodPerHour) {
+    const mastery = calculateMasteryMods(config);
+
     const preserveFoodMult = 1 - (config.preserveFood || 0) / 100;
     const food = foodPerHour * (config.foodCost || 0) * preserveFoodMult;
     const potionsPerHour = config.potionCost ? 4 : 0;
@@ -288,11 +300,16 @@ export function calculateConsumableCosts(config, killsPerHour, foodPerHour) {
     const sigilsPerHour = config.sigilCost ? 2 : 0;
     const preserveSigilMult = 1 - (config.preserveSigil || 0) / 100;
     const sigil = sigilsPerHour * (config.sigilCost || 0) * preserveSigilMult;
-    const key2 = config.contentType === 'elite' ? killsPerHour * (config.keyCost || 0) : 0;
+    // Lantern mastery (sheet sLanternMod, used as (1 - sLanternMod) in sKeyCost):
+    // reduces key cost by the mastery's tier mod fraction.
+    const lanternReduction = mastery.lantern;
+    const key2 = config.contentType === 'elite'
+        ? killsPerHour * (config.keyCost || 0) * (1 - lanternReduction)
+        : 0;
     const preserveContractMult = 1 - (config.preserveContract || 0) / 100;
     const contract = config.contractActive ? killsPerHour * (config.contractCost || 0) * preserveContractMult : 0;
     const total = food + potion + brew + sigil + key2 + contract;
-    return { food, potion, brew, sigil, key: key2, contract, total };
+    return { food, potion, brew, sigil, key: key2, contract, lanternReduction, total };
 }
 
 export function calculateGuildContribution(killsPerHour, simHours, isGuildEventActive) {

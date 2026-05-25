@@ -1639,6 +1639,7 @@ function runSimulation(page) {
                 ${breakdownRow("Contract XP", xpBreakdown.contractXp)}
                 ${breakdownRow("Outskirts XP Relic", xpBreakdown.outskirtsXp)}
                 ${breakdownRow("Insatiable XP procs", xpBreakdown.insatiableXp)}
+                ${breakdownRow("Double XP Mastery", xpBreakdown.doubleXPMastery)}
             </div>
         `);
       page.find("#cs-xp-breakdown-card").show();
@@ -1650,6 +1651,7 @@ function runSimulation(page) {
                 ${breakdownRow("Active Map Loot", lootModBreakdown.mapLoot)}
                 ${breakdownRow("Trait", lootModBreakdown.trait)}
                 ${breakdownRow("Adventure Loot", lootModBreakdown.adventureLoot)}
+                ${breakdownRow("Coin Drop Mastery", lootModBreakdown.coinMastery)}
             </div>
         `);
       page.find("#cs-loot-mod-breakdown-card").show();
@@ -1680,7 +1682,7 @@ function runSimulation(page) {
                 <div class="cs-cost-row"><span>Potion</span><span>${formatNumber(Math.round(consumableCosts.potion))}g</span></div>
                 <div class="cs-cost-row"><span>Brew</span><span>${formatNumber(Math.round(consumableCosts.brew))}g</span></div>
                 <div class="cs-cost-row"><span>Sigil</span><span>${formatNumber(Math.round(consumableCosts.sigil))}g</span></div>
-                <div class="cs-cost-row"><span>Key</span><span>${formatNumber(Math.round(consumableCosts.key))}g</span></div>
+                <div class="cs-cost-row"><span>Key${consumableCosts.lanternReduction > 0 ? ` (Lantern −${formatNumber(consumableCosts.lanternReduction * 100)}%)` : ''}</span><span>${formatNumber(Math.round(consumableCosts.key))}g</span></div>
                 ${consumableCosts.contract ? `<div class="cs-cost-row"><span>Contract</span><span>${formatNumber(Math.round(consumableCosts.contract))}g</span></div>` : ""}
             </div>
         `);
