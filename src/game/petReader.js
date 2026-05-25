@@ -118,6 +118,16 @@ async function readPetScreen() {
     if (!data.pets) return;
     inProgress = true;
     try {
+        // Detect which taming sub-tab we're on. The Pets sub-tab is the only
+        // one with both the Expedition Team header AND the Ranch header (its
+        // signature card layout). Other sub-tabs (Expedition, Breeding) also
+        // show pet rows but without those headers — scraping them as if they
+        // were the Pets sub-tab wipes out lastPets and knownTeamNames with
+        // partial / wrongly-located data.
+        const hasTeamCard  = $('taming-page .card .header:contains("Expedition Team")').length > 0;
+        const hasRanchCard = $('taming-page .card .header:contains("Ranch")').length > 0;
+        const isPetsSubTab = hasTeamCard && hasRanchCard;
+
         const pets = [];
         $('taming-page button.row').each((_i, el) => {
             const $el = $(el);
@@ -149,10 +159,14 @@ async function readPetScreen() {
         });
 
         console.log('[RiftScript pet] readPetScreen scraped pets:', pets.length,
+                    'isPetsSubTab:', isPetsSubTab,
                     'lastPets in cache:', lastPets.length,
                     'knownTeamNames:', [...knownTeamNames]);
 
-        if (pets.length) {
+        // Only treat the scrape as authoritative when we're actually on the
+        // Pets sub-tab. Otherwise the scraped subset would overwrite our good
+        // cached data with partial / mis-located pets.
+        if (pets.length && isPetsSubTab) {
             // Compute groupIndex: position-within-(name|species|level) group
             const groupCounters = {};
             for (const p of pets) {
