@@ -24,6 +24,7 @@ const EXP_TIER_KEY = 'pet-exp-selected-tier';
 let activeTab = 'manager'; // 'manager' | 'expedition'
 
 export function initPetFilter() {
+    console.log('[RiftScript pet] initPetFilter called');
     activeTab = gget(TAB_KEY, 'manager');
     // Migrate: rotation tab was removed (merged into expedition detail view)
     if (activeTab === 'rotation') {
@@ -94,10 +95,8 @@ function bindDelegatedHandlers() {
 }
 
 function onPage(page) {
+    console.log('[RiftScript pet] onPage:', page?.type);
     if (page?.type !== 'taming') {
-        // Clean up the panel so it doesn't linger on other pages — Angular
-        // keeps taming-page in the DOM after navigation, so our injected
-        // panel would otherwise stay visible on top.
         $(`#${PANEL_ID}`).remove();
         return;
     }
@@ -105,26 +104,42 @@ function onPage(page) {
 }
 
 function ensurePanel() {
-    if (!$('taming-page').length) return;
-    if ($(`#${PANEL_ID}`).length) return;
+    if (!$('taming-page').length) {
+        console.log('[RiftScript pet] ensurePanel: no taming-page in DOM, skip');
+        return;
+    }
+    if ($(`#${PANEL_ID}`).length) {
+        console.log('[RiftScript pet] ensurePanel: panel already exists, skip');
+        return;
+    }
     const $panel = $(`<div id="${PANEL_ID}" class="rs-pet-panel"></div>`);
 
     if (window.innerWidth < MOBILE_BREAKPOINT) {
-        // Mobile: above the page so it's reachable without scrolling
         $('taming-page').before($panel);
+        console.log('[RiftScript pet] ensurePanel: injected (mobile, before taming-page)');
     } else {
-        // Desktop: bottom of the right sidebar (last group inside .groups),
-        // same position as the calculation cards on skill pages.
         const $sidebar = $('taming-page > .groups > :last-child');
         if ($sidebar.length) {
             $sidebar.append($panel);
+            console.log('[RiftScript pet] ensurePanel: injected into taming-page > .groups > :last-child');
         } else {
-            // Fallback: after the last card (or, if none, before the page)
             const $target = $('taming-page .card').last();
-            if ($target.length) $target.after($panel);
-            else $('taming-page').before($panel);
+            if ($target.length) {
+                $target.after($panel);
+                console.log('[RiftScript pet] ensurePanel: injected after last .card (sidebar selector failed)');
+            } else {
+                $('taming-page').before($panel);
+                console.log('[RiftScript pet] ensurePanel: injected before taming-page (all fallbacks failed)');
+            }
         }
     }
+    // Verify the panel is actually in the document after injection.
+    setTimeout(() => {
+        const $check = $(`#${PANEL_ID}`);
+        console.log('[RiftScript pet] panel post-inject check — in DOM:', $check.length > 0,
+                    'visible:', $check.is(':visible'),
+                    'offsetHeight:', $check[0]?.offsetHeight);
+    }, 50);
 
     if (!data.pets) {
         $panel.html(`
