@@ -3,7 +3,11 @@ import * as events from '../core/events.js';
 import * as storage from '../core/storage.js';
 import { formatNumber, secondsToDuration, expToLevel, levelToExp } from '../core/util.js';
 import { simulate, calculateResults } from '../features/combatCalc.js';
-import { calculateEfficiency, calculateXpModifiers, calculateLootModifiers, calculateDamageBlock, calculateConsumableCosts, calculateGuildContribution } from '../features/modifiers.js';
+import {
+    calculateEfficiency, calculateXpModifiers, calculateLootModifiers,
+    calculateDamageBlock, calculateConsumableCosts, calculateGuildContribution,
+    TIER_OPTIONS, SIGIL_OPTIONS, MAP_MOD_OPTIONS,
+} from '../features/modifiers.js';
 import { api } from '../core/api.js';
 import { hasAuth } from '../core/auth.js';
 import { data } from '../game/data.js';
@@ -635,6 +639,63 @@ function renderPage() {
                                 ${controlInput("Adventure Effect", "cs-adventureEffect", c.adventureEffect || 0, 1, "%")}
                             </div>
                         </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Masteries</span></div>
+                            <div class="cs-control-grid">
+                                ${tierSelect("Potent",     "cs-potentTier",     c.potentTier)}
+                                ${tierSelect("Savage",     "cs-savageTier",     c.savageTier)}
+                                ${tierSelect("Insatiable", "cs-insatiableTier", c.insatiableTier)}
+                                ${tierSelect("Coin Drop",  "cs-coinTier",       c.coinTier)}
+                                ${tierSelect("Double XP",  "cs-doubleXPTier",   c.doubleXPTier)}
+                                ${tierSelect("Lantern",    "cs-lanternTier",    c.lanternTier)}
+                                ${controlInput("Runic Lv.", "cs-runicLvl", c.runicLvl || 0, 1, "")}
+                                <div class="cs-toggle-row">
+                                    <span>Active Skill XP Bonus (+4%)</span>
+                                    <label><input type="checkbox" id="cs-activeSkillXp" ${c.activeSkillXpBonus ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Vendor Gems (+2% Coin/2XP)</span>
+                                    <label><input type="checkbox" id="cs-vendorGems" ${c.vendorGems ? "checked" : ""}> Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Sigil</span></div>
+                            <div class="cs-control-grid">
+                                <div class="cs-control-row">
+                                    <span>Sigil</span>
+                                    <select class="cs-input cs-select" id="cs-sigil">
+                                        ${SIGIL_OPTIONS.map(s => `<option value="${s}" ${(c.sigilName || "None") === s ? "selected" : ""}>${s}</option>`).join("")}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Active Map</span></div>
+                            <div class="cs-control-grid">
+                                <div class="cs-control-row">
+                                    <span>Mod Type</span>
+                                    <select class="cs-input cs-select" id="cs-mapModType">
+                                        ${MAP_MOD_OPTIONS.map(m => `<option value="${m}" ${(c.mapModType || "None") === m ? "selected" : ""}>${m}</option>`).join("")}
+                                    </select>
+                                </div>
+                                <div class="cs-control-row">
+                                    <span>Map Tier</span>
+                                    <select class="cs-input cs-select" id="cs-mapTier">
+                                        ${['None','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10']
+                                            .map(t => `<option value="${t}" ${(c.mapTier || "None") === t ? "selected" : ""}>${t}</option>`).join("")}
+                                    </select>
+                                </div>
+                                <div class="cs-control-row">
+                                    <span>Map State</span>
+                                    <select class="cs-input cs-select" id="cs-mapState">
+                                        <option value="Enabled" ${(c.mapState || "Enabled") === "Enabled" ? "selected" : ""}>Enabled (full uptime)</option>
+                                        <option value="Average" ${c.mapState === "Average" ? "selected" : ""}>Average (24h/week)</option>
+                                        <option value="Disabled" ${c.mapState === "Disabled" ? "selected" : ""}>Disabled</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Consumables Tab -->
@@ -875,6 +936,19 @@ function controlInput(label, id, value, step = 1, suffix = "") {
                 <span class="cs-fetched" id="${id}-fetched"></span>
                 <input class="cs-input" id="${id}" type="number" value="${value}" step="${step}">
             </span>
+        </div>
+    `;
+}
+
+function tierSelect(label, id, current) {
+    const value = current || 'None';
+    const options = TIER_OPTIONS
+        .map(t => `<option value="${t}" ${value === t ? 'selected' : ''}>${t}</option>`)
+        .join('');
+    return `
+        <div class="cs-control-row">
+            <span>${label}</span>
+            <select class="cs-input cs-select" id="${id}">${options}</select>
         </div>
     `;
   }
@@ -1291,7 +1365,25 @@ function buildSimConfig(page) {
       contractCost: 0,
       // Adventure
       adventureMode: page.find("#cs-adventureMode").val() || "disabled",
-      adventureEffect: val("cs-adventureEffect")
+      adventureEffect: val("cs-adventureEffect"),
+      // Phase 2: masteries (tier strings → tier mod via Tiers lookup),
+      // sigil (name → SIGIL_DATA lookup), active map (mod type + tier + state),
+      // active-skill XP toggle, vendor gems toggle, Runic mastery level.
+      potentTier: page.find("#cs-potentTier").val() || "None",
+      savageTier: page.find("#cs-savageTier").val() || "None",
+      insatiableTier: page.find("#cs-insatiableTier").val() || "None",
+      coinTier: page.find("#cs-coinTier").val() || "None",
+      doubleXPTier: page.find("#cs-doubleXPTier").val() || "None",
+      lanternTier: page.find("#cs-lanternTier").val() || "None",
+      runicLvl: val("cs-runicLvl"),
+      activeSkillXpBonus: page.find("#cs-activeSkillXp").is(":checked"),
+      vendorGems: page.find("#cs-vendorGems").is(":checked"),
+      sigilName: page.find("#cs-sigil").val() || "None",
+      mapModType: page.find("#cs-mapModType").val() || "None",
+      mapTier: page.find("#cs-mapTier").val() || "None",
+      mapState: page.find("#cs-mapState").val() || "Enabled",
+      wisdomTomeActive: page.find("#cs-wisdomTomeActive").is(":checked"),
+      insatiableTomeActive: page.find("#cs-insatiableTomeActive").is(":checked"),
     };
   }
 function runSimulation(page) {
@@ -1379,7 +1471,23 @@ function runSimulation(page) {
       contractActive: config.contractActive,
       // Adventure
       adventureMode: config.adventureMode,
-      adventureEffect: config.adventureEffect
+      adventureEffect: config.adventureEffect,
+      // Phase 2: masteries / sigil / map / toggles
+      potentTier: config.potentTier,
+      savageTier: config.savageTier,
+      insatiableTier: config.insatiableTier,
+      coinTier: config.coinTier,
+      doubleXPTier: config.doubleXPTier,
+      lanternTier: config.lanternTier,
+      runicLvl: config.runicLvl,
+      activeSkillXpBonus: config.activeSkillXpBonus,
+      vendorGems: config.vendorGems,
+      sigilName: config.sigilName,
+      mapModType: config.mapModType,
+      mapTier: config.mapTier,
+      mapState: config.mapState,
+      wisdomTomeActive: config.wisdomTomeActive,
+      insatiableTomeActive: config.insatiableTomeActive
     });
     const btn = page.find("#cs-run");
     btn.text("Simulating...").prop("disabled", true);
@@ -1446,46 +1554,53 @@ function runSimulation(page) {
           page.find("#cs-loot-card").show();
         }
       }
+      const breakdownRow = (label, value) =>
+          `<div class="cs-breakdown-row"><span>${label}</span><span>${formatNumber(value || 0)}%</span></div>`;
       page.find("#cs-eff-breakdown-body").html(`
             <div class="cs-breakdown">
                 <div class="cs-breakdown-total">Total Efficiency: ${formatNumber(effBreakdown.total)}%</div>
-                <div class="cs-breakdown-row"><span>Level Advantage</span><span>${formatNumber(effBreakdown.level)}%</span></div>
-                <div class="cs-breakdown-row"><span>Guild Library</span><span>${formatNumber(effBreakdown.guild)}%</span></div>
-                <div class="cs-breakdown-row"><span>Ring / Equipment</span><span>${formatNumber(effBreakdown.ring)}%</span></div>
-                <div class="cs-breakdown-row"><span>Efficiency Relic</span><span>${formatNumber(effBreakdown.effRune)}%</span></div>
-                <div class="cs-breakdown-row"><span>Insatiable Tome</span><span>${formatNumber(effBreakdown.insatiable)}%</span></div>
-                <div class="cs-breakdown-row"><span>Trait</span><span>${formatNumber(effBreakdown.trait)}%</span></div>
-                <div class="cs-breakdown-row"><span>Marks</span><span>${formatNumber(effBreakdown.marks)}%</span></div>
-                <div class="cs-breakdown-row"><span>Region Rune Mastery</span><span>${formatNumber(effBreakdown.regionRuneMastery)}%</span></div>
-                <div class="cs-breakdown-row"><span>Extra Double Action</span><span>${formatNumber(effBreakdown.extraDoubleAction)}%</span></div>
-                <div class="cs-breakdown-row"><span>Potion Multi-Kill</span><span>${formatNumber(effBreakdown.potionMultiKill)}%</span></div>
+                ${breakdownRow("Primary Level", effBreakdown.level)}
+                ${breakdownRow("Guild (Library + Event Hall)", effBreakdown.guild)}
+                ${breakdownRow("Ring / Equipment", effBreakdown.ring)}
+                ${breakdownRow("Efficiency Relic", effBreakdown.effRune)}
+                ${breakdownRow("Insatiable (active)", effBreakdown.insatiable)}
+                ${breakdownRow("Trait", effBreakdown.trait)}
+                ${breakdownRow("Marks", effBreakdown.marks)}
+                ${breakdownRow("Region Rune Mastery", effBreakdown.regionRuneMastery)}
+                ${breakdownRow("Extra Double Action", effBreakdown.extraDoubleAction)}
+                ${breakdownRow("Potion Multi-Kill", effBreakdown.potionMultiKill)}
+                ${breakdownRow("Sigil + Runic", effBreakdown.sigilEff)}
             </div>
         `);
       page.find("#cs-eff-breakdown-card").show();
       page.find("#cs-xp-breakdown-body").html(`
             <div class="cs-breakdown">
                 <div class="cs-breakdown-total">Total XP Bonus: ${formatNumber(xpBreakdown.total)}%</div>
-                <div class="cs-breakdown-row"><span>Potion</span><span>${formatNumber(xpBreakdown.potion)}%</span></div>
-                <div class="cs-breakdown-row"><span>Brew</span><span>${formatNumber(xpBreakdown.brew)}%</span></div>
-                <div class="cs-breakdown-row"><span>Double XP Relic</span><span>${formatNumber(xpBreakdown.relicDoubleXP)}%</span></div>
-                <div class="cs-breakdown-row"><span>Trait</span><span>${formatNumber(xpBreakdown.trait)}%</span></div>
-                <div class="cs-breakdown-row"><span>Mark</span><span>${formatNumber(xpBreakdown.mark)}%</span></div>
-                <div class="cs-breakdown-row"><span>Savage Tome</span><span>${formatNumber(xpBreakdown.savageTome)}%</span></div>
-                <div class="cs-breakdown-row"><span>Bracelet</span><span>${formatNumber(xpBreakdown.bracelet)}%</span></div>
-                <div class="cs-breakdown-row"><span>Weapon</span><span>${formatNumber(xpBreakdown.weapon)}%</span></div>
-                <div class="cs-breakdown-row"><span>Skill XP Bonus</span><span>${formatNumber(xpBreakdown.skillXpBonus)}%</span></div>
-                <div class="cs-breakdown-row"><span>Adventure XP</span><span>${formatNumber(xpBreakdown.adventureXp)}%</span></div>
-                <div class="cs-breakdown-row"><span>Contract XP</span><span>${formatNumber(xpBreakdown.contractXp)}%</span></div>
+                ${breakdownRow("Potion (× Potent)", xpBreakdown.potion)}
+                ${breakdownRow("Brew", xpBreakdown.brew)}
+                ${breakdownRow("Sigil + Runic", xpBreakdown.sigilXp)}
+                ${breakdownRow("Savage Mastery", xpBreakdown.savage)}
+                ${breakdownRow("Active Skill", xpBreakdown.activeSkill)}
+                ${breakdownRow("Bracelet / Equipment", xpBreakdown.bracelet)}
+                ${breakdownRow("Active Map XP", xpBreakdown.mapXP)}
+                ${breakdownRow("Double XP Relic", xpBreakdown.relicDoubleXP)}
+                ${breakdownRow("Trait", xpBreakdown.trait)}
+                ${breakdownRow("Mark", xpBreakdown.mark)}
+                ${breakdownRow("Weapon", xpBreakdown.weapon)}
+                ${breakdownRow("Skill XP Bonus", xpBreakdown.skillXpBonus)}
+                ${breakdownRow("Adventure XP", xpBreakdown.adventureXp)}
+                ${breakdownRow("Contract XP", xpBreakdown.contractXp)}
             </div>
         `);
       page.find("#cs-xp-breakdown-card").show();
       page.find("#cs-loot-mod-breakdown-body").html(`
             <div class="cs-breakdown">
                 <div class="cs-breakdown-total">Total Loot Bonus: ${formatNumber(lootModBreakdown.total)}%</div>
-                <div class="cs-breakdown-row"><span>Amulet / Equipment</span><span>${formatNumber(lootModBreakdown.amulet)}%</span></div>
-                <div class="cs-breakdown-row"><span>Potion</span><span>${formatNumber(lootModBreakdown.potion)}%</span></div>
-                <div class="cs-breakdown-row"><span>Trait</span><span>${formatNumber(lootModBreakdown.trait)}%</span></div>
-                <div class="cs-breakdown-row"><span>Adventure Loot</span><span>${formatNumber(lootModBreakdown.adventureLoot)}%</span></div>
+                ${breakdownRow("Amulet / Equipment", lootModBreakdown.amulet)}
+                ${breakdownRow("Potion (× Potent)", lootModBreakdown.potion)}
+                ${breakdownRow("Active Map Loot", lootModBreakdown.mapLoot)}
+                ${breakdownRow("Trait", lootModBreakdown.trait)}
+                ${breakdownRow("Adventure Loot", lootModBreakdown.adventureLoot)}
             </div>
         `);
       page.find("#cs-loot-mod-breakdown-card").show();
