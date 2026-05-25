@@ -9,24 +9,26 @@ import { hasAuth } from '../core/auth.js';
 import { data } from '../game/data.js';
 import { getMode } from '../game/mode.js';
 
-let NAV_ID = "riftscript-combatsim-btn";
-let PAGE_TAG = "combatsim-page";
-let ASSET_BASE = "https://ironwoodrpg.com/assets";
+const NAV_ID = "riftscript-combatsim-btn";
+const PAGE_TAG = "combatsim-page";
+const ASSET_BASE = "https://ironwoodrpg.com/assets";
+const REGIONS = [
+    { id: "forest", label: "Forest" },
+    { id: "mountain", label: "Mountain" },
+    { id: "ocean", label: "Ocean" },
+];
+
 let isOpen = false;
 let selectedActionId = null;
 let selectedRegion = "forest";
 let selectedMonsterType = "normal";
 let lastXpPerHour = 0;
 let fetchedUserData = null;
-let REGIONS = [
-    { id: "forest", label: "Forest" },
-    { id: "mountain", label: "Mountain" },
-    { id: "ocean", label: "Ocean" }
-  ];
+
 function totalXpToLevelInt(level) {
     if (level < 101) return Math.floor(1.2 * Math.pow(level, 3.5));
-    return Math.floor(12e6 * Math.pow(Math.pow(3500, 0.01), level - 100));
-  }
+    return Math.floor(12_000_000 * Math.pow(Math.pow(3500, 0.01), level - 100));
+}
 function totalXpToLevel(level) {
     const floorL = Math.floor(level);
     const ceilL = Math.ceil(level);
@@ -40,7 +42,7 @@ function timeToLevel(startLevel, endLevel, xpPerHour) {
     const xpNeeded = totalXpToLevel(endLevel) - totalXpToLevel(startLevel);
     return xpNeeded / xpPerHour * 3600;
   }
-let FOOD_TYPES = [
+const FOOD_TYPES = [
     { name: "None", hp: 0, cost: 0 },
     { name: "King Crab Pie", hp: 240, cost: 430 },
     { name: "Shark Pie", hp: 210, cost: 305 },
@@ -57,24 +59,24 @@ let FOOD_TYPES = [
     { name: "Cooked Bass", hp: 60, cost: 40 },
     { name: "Cooked Salmon", hp: 45, cost: 32 },
     { name: "Cooked Cod", hp: 30, cost: 45 },
-    { name: "Cooked Shrimp", hp: 15, cost: 25 }
-  ];
-let POTION_TYPES = [
+    { name: "Cooked Shrimp", hp: 15, cost: 25 },
+];
+const POTION_TYPES = [
     { name: "None", type: "none", cost: 0, effect: 0 },
-    { name: "Divine XP Potion", type: "xp", cost: 8e3, effect: 60 },
-    { name: "Super XP Potion", type: "xp", cost: 3500, effect: 40 },
-    { name: "XP Potion", type: "xp", cost: 1200, effect: 20 },
-    { name: "Divine Loot Potion", type: "loot", cost: 8e3, effect: 60 },
-    { name: "Super Loot Potion", type: "loot", cost: 3500, effect: 40 },
-    { name: "Loot Potion", type: "loot", cost: 1200, effect: 20 }
-  ];
-let BREW_TYPES = [
-    { name: "None", type: "none", cost: 0, effect: 0 },
-    { name: "Regular Brew", type: "xp", cost: 500, effect: 15 },
-    { name: "Basic Brew", type: "xp", cost: 200, effect: 8 }
-  ];
+    { name: "Divine XP Potion",   type: "xp",   cost: 8000, effect: 60 },
+    { name: "Super XP Potion",    type: "xp",   cost: 3500, effect: 40 },
+    { name: "XP Potion",          type: "xp",   cost: 1200, effect: 20 },
+    { name: "Divine Loot Potion", type: "loot", cost: 8000, effect: 60 },
+    { name: "Super Loot Potion",  type: "loot", cost: 3500, effect: 40 },
+    { name: "Loot Potion",        type: "loot", cost: 1200, effect: 20 },
+];
+const BREW_TYPES = [
+    { name: "None",         type: "none", cost: 0,   effect: 0 },
+    { name: "Regular Brew", type: "xp",   cost: 500, effect: 15 },
+    { name: "Basic Brew",   type: "xp",   cost: 200, effect: 8 },
+];
 export function initCombatSimPage() {
-    setInterval(injectNavButton, 1e3);
+    setInterval(injectNavButton, 1000);
     events.on("page", (page) => {
       if (page.type !== "combatsim") {
         $(PAGE_TAG).remove();
@@ -129,10 +131,10 @@ async function openPage() {
     } else {
       console.log('[CombatSim] navigating to merchant...');
       triggerNav("merchant");
-      await waitFor("merchant-page", 3e3);
+      await waitFor("merchant-page", 3000);
       console.log('[CombatSim] merchant found, navigating to settings...');
       triggerNav("settings");
-      await waitFor("settings-page", 3e3);
+      await waitFor("settings-page", 3000);
       console.log('[CombatSim] settings found, removing...');
       $("settings-page").remove();
     }
@@ -159,7 +161,7 @@ function cleanupPage() {
     $(`#${NAV_ID}`).removeClass("rs-nav-active");
     $("header-component div.wrapper > div.image").show();
   }
-function waitFor(selector, timeout = 3e3) {
+function waitFor(selector, timeout = 3000) {
     return new Promise((resolve) => {
       if ($(selector).length) return resolve();
       const interval = setInterval(() => {
@@ -174,17 +176,17 @@ function waitFor(selector, timeout = 3e3) {
       }, timeout);
     });
   }
-let EQUIPMENT_SLOTS = [
-    { key: "weapon", label: "Weapon", apiSlot: "1" },
-    { key: "shield", label: "Shield", apiSlot: "2" },
-    { key: "helmet", label: "Helmet", apiSlot: "3" },
-    { key: "body", label: "Body", apiSlot: "4" },
-    { key: "gloves", label: "Gloves", apiSlot: "5" },
-    { key: "boots", label: "Boots", apiSlot: "6" },
-    { key: "amulet", label: "Amulet", apiSlot: "7" },
-    { key: "ring", label: "Ring", apiSlot: "8" },
-    { key: "bracelet", label: "Bracelet", apiSlot: "55" }
-  ];
+const EQUIPMENT_SLOTS = [
+    { key: "weapon",   label: "Weapon",   apiSlot: "1" },
+    { key: "shield",   label: "Shield",   apiSlot: "2" },
+    { key: "helmet",   label: "Helmet",   apiSlot: "3" },
+    { key: "body",     label: "Body",     apiSlot: "4" },
+    { key: "gloves",   label: "Gloves",   apiSlot: "5" },
+    { key: "boots",    label: "Boots",    apiSlot: "6" },
+    { key: "amulet",   label: "Amulet",   apiSlot: "7" },
+    { key: "ring",     label: "Ring",     apiSlot: "8" },
+    { key: "bracelet", label: "Bracelet", apiSlot: "55" },
+];
 function getEquipmentCategory(item) {
     if (!item || !item.image) return null;
     const img = item.image.toLowerCase();
@@ -841,17 +843,11 @@ function renderPage() {
     });
     page.find("#cs-potionSelect").on("change", function() {
       const selected = POTION_TYPES.find((p) => p.name === $(this).val());
-      if (selected) {
-        page.find("#cs-potionCost").val(selected.cost);
-        page.find("#cs-potionEffect").val(selected.effect);
-      }
+      if (selected) page.find("#cs-potionCost").val(selected.cost);
     });
     page.find("#cs-brewSelect").on("change", function() {
       const selected = BREW_TYPES.find((b) => b.name === $(this).val());
-      if (selected) {
-        page.find("#cs-brewCost").val(selected.cost);
-        page.find("#cs-brewEffect").val(selected.effect);
-      }
+      if (selected) page.find("#cs-brewCost").val(selected.cost);
     });
     page.find("#cs-contentType").on("change", function() {
       const val = $(this).val();
@@ -1168,12 +1164,15 @@ function buildSimConfig(page) {
     const potionEntry = POTION_TYPES.find((p) => p.name === potionName) || POTION_TYPES[0];
     const potionType = potionEntry.type;
     const potionCost = val("cs-potionCost");
-    const potionEffect = val("cs-potionEffect");
+    // Effect is read straight from the POTION_TYPES record — there is no
+    // #cs-potionEffect input in the HTML, so val() would return 0 here and
+    // silently zero out the potion XP / loot bonus in calculateXpModifiers.
+    const potionEffect = potionEntry.effect || 0;
     const brewName = page.find("#cs-brewSelect").val() || "None";
     const brewEntry = BREW_TYPES.find((b) => b.name === brewName) || BREW_TYPES[0];
     const brewType = brewEntry.type;
     const brewCost = val("cs-brewCost");
-    const brewEffect = val("cs-brewEffect");
+    const brewEffect = brewEntry.effect || 0;
     const contentTypeDropdown = page.find("#cs-contentType").val() || "normal";
     const contentType = contentTypeDropdown;
     let monsterLevel = 0;
@@ -1199,6 +1198,12 @@ function buildSimConfig(page) {
       monsterSpeed,
       monsterDamage,
       monsterBlock,
+      // cs-eff / cs-loot / cs-xp hold the equipment-derived ring / amulet /
+      // bracelet chances. Both the legacy single-source field (efficiency,
+      // lootBonus, xpBonus) and the modifier-breakdown field (efficiencyChance,
+      // doubleLootChance, doubleExpChance) are kept for back-compat with saved
+      // configs; the runSimulation orchestrator overrides the single-source
+      // ones with the full breakdown totals before calling simulate/calc.
       efficiency: val("cs-eff"),
       efficiencyChance: val("cs-eff"),
       lootBonus: val("cs-loot"),
@@ -1292,13 +1297,13 @@ function buildSimConfig(page) {
 function runSimulation(page) {
     if (!selectedActionId) {
       page.find("#cs-alert").text("Select a monster from the list first.").show();
-      setTimeout(() => page.find("#cs-alert").fadeOut(), 3e3);
+      setTimeout(() => page.find("#cs-alert").fadeOut(), 3000);
       return;
     }
     const config = buildSimConfig(page);
     if (config.monsterHealth <= 0) {
       page.find("#cs-alert").text("Monster has no health. Cannot simulate.").show();
-      setTimeout(() => page.find("#cs-alert").fadeOut(), 3e3);
+      setTimeout(() => page.find("#cs-alert").fadeOut(), 3000);
       return;
     }
     storage.save("combatsim-config", {
@@ -1379,17 +1384,26 @@ function runSimulation(page) {
     const btn = page.find("#cs-run");
     btn.text("Simulating...").prop("disabled", true);
     setTimeout(() => {
-      const sim = simulate({
-        ...config,
-        isOutskirts: config.isOutskirts,
-        outskirtsDelay: config.outskirtsDelay
-      });
-      const results = calculateResults(config, sim);
-      const fmt = (n) => formatNumber(Math.round(n));
+      // Compute modifier breakdowns first, then feed their totals to the
+      // simulator and result calc. Previously we passed only the equipment
+      // chance fields (cs-eff / cs-xp / cs-loot), which dropped every other
+      // efficiency / XP / loot source from the actual numbers even though
+      // they were still shown in the breakdown panels.
       const effBreakdown = calculateEfficiency(config);
       const xpBreakdown = calculateXpModifiers(config);
       const lootModBreakdown = calculateLootModifiers(config);
       const dmgBreakdown = calculateDamageBlock(config);
+
+      const sim = simulate({
+        ...config,
+        efficiency: effBreakdown.total,
+      });
+      const results = calculateResults({
+        ...config,
+        xpBonus: xpBreakdown.total,
+        lootBonus: lootModBreakdown.total,
+      }, sim);
+      const fmt = (n) => formatNumber(Math.round(n));
       const consumableCosts = calculateConsumableCosts(config, sim.finalKPH, sim.foodPerHour);
       const guildContrib = calculateGuildContribution(sim.finalKPH, config.simHours, config.guildEventActive);
       const fullProfit = results.lootPerHour - consumableCosts.total;
@@ -1410,7 +1424,11 @@ function runSimulation(page) {
         `);
       page.find("#cs-results-card").show();
       if (selectedActionId) {
-        const loot = getLootBreakdown(selectedActionId, sim.finalKPH * (1 + (config.lootBonus || 0) / 100));
+        // Use the same loot total used in the header so per-item rows sum back
+        // to it. Previously this multiplied by config.lootBonus (= equipment
+        // amulet only), drifting from the calculateResults total which uses
+        // the full breakdown.
+        const loot = getLootBreakdown(selectedActionId, sim.finalKPH * (1 + lootModBreakdown.total / 100));
         if (loot.length) {
           let lootHtml = "";
           for (const item of loot) {

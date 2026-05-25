@@ -145,7 +145,10 @@ export function simulate(config) {
 
     const hours = simulationTime / 3600;
     const baseKPH = monstersDefeated / hours;
-    const finalKPH = baseKPH * (1 + (config.efficiency || 0) / 100);
+    // Sheet BE103 / BE102: efficiency multiplier is skipped in Outskirts.
+    const finalKPH = isOutskirts
+        ? baseKPH
+        : baseKPH * (1 + (config.efficiency || 0) / 100);
     const foodPerHour = healsUsed / hours;
 
     return {

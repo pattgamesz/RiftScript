@@ -119,6 +119,4 @@ export function calculateGuildContribution(killsPerHour, simHours, isGuildEventA
     if (!isGuildEventActive) return 0;
     const baseContribution = killsPerHour * simHours;
     return Math.floor(baseContribution);
-  }
-
-  // src/ui/combatSimPage.js
+}
