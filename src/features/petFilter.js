@@ -46,13 +46,51 @@ export function initPetFilter() {
     // Sub-tab clicks inside taming-page (Pets / Ranch / Breeding / Expedition)
     // re-render Angular's groups container without firing a 'page' event, so
     // our injected panel disappears. Poll-and-reinject keeps it alive on every
-    // taming sub-tab including the in-game Expedition view.
+    // taming sub-tab including the in-game Expedition view. ensurePanel handles
+    // its own renderPanel; we don't trigger the pet reader here because that
+    // could re-render the panel out from under an in-progress click.
     setInterval(() => {
         if ($('taming-page').length && !$(`#${PANEL_ID}`).length) {
             ensurePanel();
-            triggerPetReader();
         }
     }, 1000);
+
+    // Delegated handlers — survive every renderPanel re-render because they're
+    // bound to document, not to the (frequently replaced) panel children.
+    bindDelegatedHandlers();
+}
+
+function bindDelegatedHandlers() {
+    const sel = `#${PANEL_ID}`;
+    $(document).on('click', `${sel} .rs-pet-tab`, function() {
+        activeTab = $(this).data('tab');
+        gset(TAB_KEY, activeTab);
+        renderPanel();
+    });
+    $(document).on('change', `${sel} .rs-exp-tier-select`, function() {
+        gset(EXP_TIER_KEY, +$(this).val() || 0);
+        renderPanel();
+    });
+    $(document).on('change', `${sel} .rs-exp-week`, function() {
+        gset(EXP_WEEK_KEY, +$(this).val() || 0);
+        renderPanel();
+    });
+    $(document).on('change', `${sel} .rs-pet-family`, function() {
+        gset(FAMILY_KEY, $(this).val());
+        triggerPetReader();
+    });
+    $(document).on('change', `${sel} .rs-pet-sort`, function() {
+        gset(SORT_KEY, $(this).val());
+        triggerPetReader();
+    });
+    $(document).on('change', `${sel} .rs-pet-dup`, function() {
+        gset(DUP_KEY, $(this).is(':checked'));
+        triggerPetReader();
+    });
+    $(document).on('change', `${sel} .rs-pet-perfect`, function() {
+        gset(PERFECT_KEY, $(this).is(':checked'));
+        triggerPetReader();
+    });
 }
 
 function onPage(page) {
@@ -143,41 +181,7 @@ function renderPanel() {
         </div>
         <div class="rs-branding">Powered by RiftScript</div>
     `);
-
-    $panel.find('.rs-pet-tab').on('click', function() {
-        activeTab = $(this).data('tab');
-        gset(TAB_KEY, activeTab);
-        renderPanel();
-    });
-
-    if (activeTab === 'expedition') {
-        $panel.find('.rs-exp-tier-select').on('change', function() {
-            gset(EXP_TIER_KEY, +$(this).val() || 0);
-            renderPanel();
-        });
-        $panel.find('.rs-exp-week').on('change', function() {
-            gset(EXP_WEEK_KEY, +$(this).val() || 0);
-            renderPanel();
-        });
-    }
-    if (activeTab === 'manager') {
-        $panel.find('.rs-pet-family').on('change', function() {
-            gset(FAMILY_KEY, $(this).val());
-            triggerPetReader();
-        });
-        $panel.find('.rs-pet-sort').on('change', function() {
-            gset(SORT_KEY, $(this).val());
-            triggerPetReader();
-        });
-        $panel.find('.rs-pet-dup').on('change', function() {
-            gset(DUP_KEY, $(this).is(':checked'));
-            triggerPetReader();
-        });
-        $panel.find('.rs-pet-perfect').on('change', function() {
-            gset(PERFECT_KEY, $(this).is(':checked'));
-            triggerPetReader();
-        });
-    }
+    // Tab + form handlers are bound once via bindDelegatedHandlers() in init.
 }
 
 function renderManagerTab() {
