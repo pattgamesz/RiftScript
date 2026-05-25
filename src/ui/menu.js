@@ -286,6 +286,7 @@ function renderInfoCard() {
             <div class="rs-row"><span>Game Mode</span><span>${modeLabel}</span></div>
             <div class="rs-row"><span>Made by</span><span>Patt</span></div>
             <div class="rs-row"><span>Website</span><span><a href="https://rift-guild.com" target="_blank" style="color:#4a9eff;text-decoration:none">rift-guild.com</a></span></div>
+            <div class="rs-row"><span>Feedback</span><span><a href="https://rift-guild.com/riftscript/" target="_blank" style="color:#4a9eff;text-decoration:none">rift-guild.com/riftscript</a></span></div>
             <div class="rs-row"><span>Script based on</span><span>ironwood-scripts by Pancake</span></div>
             <div class="rs-row"><span>Combat Sim based on</span><span>spreadsheet by Rivea</span></div>
         </div>
