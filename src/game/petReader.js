@@ -15,6 +15,24 @@ let lastPets = [];           // last emitted pet list (for modal -> groupIndex l
 let lastClickedRow = null;   // DOM element the user just clicked
 let knownTeamNames = new Set(); // cached across sub-tab navigation
 
+// Persist team-name set across sessions so the Expedition calc has team
+// data even on a hard refresh while on the in-game Expedition sub-tab.
+// Storing only names (not full pets) keeps it small + privacy-friendly.
+const TEAM_NAMES_KEY = 'riftscript_pet_team_names_v1';
+function loadKnownTeamNames() {
+    try {
+        const raw = localStorage.getItem(TEAM_NAMES_KEY);
+        if (!raw) return;
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) knownTeamNames = new Set(arr);
+    } catch (e) { /* ignore */ }
+}
+function saveKnownTeamNames() {
+    try {
+        localStorage.setItem(TEAM_NAMES_KEY, JSON.stringify([...knownTeamNames]));
+    } catch (e) { /* quota */ }
+}
+
 // getUser cache — contains the player's pets with unique IDs + stats
 let userCache = null;
 let userCacheTime = 0;
@@ -23,6 +41,7 @@ let loggedUserShape = false;
 const USER_TTL_MS = 60_000;
 
 export function initPetReader() {
+    loadKnownTeamNames();
     events.on('page', () => trigger());
     $(document).on('click', 'taming-page button, taming-page .tab', () => setTimeout(trigger, 200));
 
@@ -161,7 +180,9 @@ async function readPetScreen() {
 
             // Remember team membership so we can reconstruct it on sub-tabs
             // where the team DOM isn't rendered (e.g., expedition sub-tab).
+            // Persisted to localStorage so it survives refresh-while-on-Expedition.
             knownTeamNames = new Set(pets.filter(p => p.location === 'team').map(p => p.name));
+            saveKnownTeamNames();
 
             lastPets = pets;
             events.emit('reader-pet', pets);
