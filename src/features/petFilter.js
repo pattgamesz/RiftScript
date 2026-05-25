@@ -270,6 +270,8 @@ function expeditionResultsOrError() {
     scrapeRotationsFromDOM();
     const weekOffset = +gget(EXP_WEEK_KEY, 0) || 0;
     const pets = events.last('reader-pet') || [];
+    console.log('[RiftScript pet] renderExpeditionTab — pets in last emit:', pets.length,
+                'team count:', pets.filter(p => p.location === 'team').length);
     const result = getExpeditionResults(pets, weekOffset);
     if (!result.ready) {
         if (result.reason === 'empty') {

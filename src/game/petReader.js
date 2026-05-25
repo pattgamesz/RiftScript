@@ -148,6 +148,10 @@ async function readPetScreen() {
             });
         });
 
+        console.log('[RiftScript pet] readPetScreen scraped pets:', pets.length,
+                    'lastPets in cache:', lastPets.length,
+                    'knownTeamNames:', [...knownTeamNames]);
+
         if (pets.length) {
             // Compute groupIndex: position-within-(name|species|level) group
             const groupCounters = {};
@@ -187,11 +191,8 @@ async function readPetScreen() {
             lastPets = pets;
             events.emit('reader-pet', pets);
         } else if (lastPets.length) {
-            // DOM has no pet rows (e.g., on the in-game Expedition / Ranch /
-            // Breeding sub-tab where the .row buttons aren't rendered). Re-emit
-            // the last good scrape so the expedition calc keeps showing data.
-            // The stale .element jQuery refs become no-ops on visual decoration,
-            // which is fine — the expedition tab doesn't need DOM access.
+            console.log('[RiftScript pet] re-emitting lastPets — team count:',
+                        lastPets.filter(p => p.location === 'team').length);
             events.emit('reader-pet', lastPets);
         } else {
             // No prior scrape — first load on a sub-tab without pet rows.
