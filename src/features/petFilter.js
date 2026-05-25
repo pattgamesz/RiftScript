@@ -215,7 +215,7 @@ function renderManagerTab() {
             <div class="rs-pet-label">Family</div>
             <select class="rs-pet-family rs-pet-select">
                 <option value="All" ${family === 'All' ? 'selected' : ''}>All</option>
-                ${families.map(f => `<option value="${esc(f)}" ${family === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}
+                ${families.map(f => `<option value="${escapeHtml(f)}" ${family === f ? 'selected' : ''}>${escapeHtml(f)}</option>`).join('')}
             </select>
         </div>
         <div class="rs-pet-row">
@@ -295,13 +295,13 @@ function renderExpeditionTab() {
     const sel = tiers.find(t => t.tier === selectedTier);
 
     const tierOptions = tiers.map(t =>
-        `<option value="${t.tier}" ${t.tier === selectedTier ? 'selected' : ''}>T${t.tier}: ${esc(t.name)}</option>`
+        `<option value="${t.tier}" ${t.tier === selectedTier ? 'selected' : ''}>T${t.tier}: ${escapeHtml(t.name)}</option>`
     ).join('');
 
     const cls = sel.chance >= 100 ? 'rs-exp-good' : sel.chance >= 80 ? 'rs-exp-mid' : 'rs-exp-bad';
     const dropRows = (sel.drops || []).map(d => `
         <div class="rs-exp-detail-row">
-            <span class="rs-exp-detail-label">${esc(d.name)}</span>
+            <span class="rs-exp-detail-label">${escapeHtml(d.name)}</span>
             <span class="rs-exp-detail-value">${formatNumber(d.amount)}</span>
         </div>
     `).join('') || `<div class="rs-pet-hint" style="font-style:normal;padding:6px 14px">No matching drops — team has no relevant abilities.</div>`;
@@ -331,13 +331,13 @@ function renderExpeditionTab() {
             ${sel.food ? `
                 <div class="rs-exp-detail-row">
                     <span class="rs-exp-detail-label">Food cost</span>
-                    <span class="rs-exp-detail-value">${formatNumber(sel.food.amount)} ${esc(sel.food.name)}</span>
+                    <span class="rs-exp-detail-value">${formatNumber(sel.food.amount)} ${escapeHtml(sel.food.name)}</span>
                 </div>
             ` : ''}
             ${sel.egg ? `
                 <div class="rs-exp-detail-row">
                     <span class="rs-exp-detail-label">Egg chance</span>
-                    <span class="rs-exp-detail-value">${formatNumber(sel.egg.chance * 100)}% ${esc(sel.egg.name)}</span>
+                    <span class="rs-exp-detail-value">${formatNumber(sel.egg.chance * 100)}% ${escapeHtml(sel.egg.name)}</span>
                 </div>
             ` : ''}
             <div class="rs-exp-detail-row">
