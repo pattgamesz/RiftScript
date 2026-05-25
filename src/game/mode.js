@@ -22,7 +22,6 @@ function detectMode() {
     }
     if (mode && mode !== currentMode) {
         currentMode = mode;
-        console.log('[RiftScript] Game mode:', mode);
         events.emit('mode', mode);
     }
 }

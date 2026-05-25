@@ -17,7 +17,6 @@ let apiInFlight = null;
 let apiBackoffUntil = 0;
 const API_TTL_MS = 5 * 60_000;
 const API_BACKOFF_MS = 5 * 60_000;
-let loggedShape = false;
 
 export function initMarketReader() {
     events.on('page', onPage);
@@ -62,10 +61,6 @@ async function getApiListings() {
     apiInFlight = (async () => {
         try {
             const resp = await api.getMarketItems();
-            if (!loggedShape) {
-                loggedShape = true;
-                console.log('[RiftScript] getMarketItems sample:', shapeSample(resp));
-            }
             apiCache = normalizeApiResponse(resp);
             apiCacheTime = now;
             return apiCache;
@@ -73,7 +68,6 @@ async function getApiListings() {
             // Back off 2min so we don't spam the API or trigger any in-game
             // error toasts if the user's session is in a weird state.
             apiBackoffUntil = Date.now() + API_BACKOFF_MS;
-            console.warn('[RiftScript] getMarketItems failed, backing off 5m:', e.message);
             return apiCache; // fall back to last good cache, may be null
         } finally {
             apiInFlight = null;
@@ -100,20 +94,6 @@ function normalizeApiResponse(resp) {
         seller: r.name ?? r.sellerName ?? r.seller ?? r.playerName ?? r.displayName
               ?? r.userName ?? r.username ?? r.player ?? r.user ?? r.owner ?? null,
     })).filter(l => l.item != null && l.seller);
-}
-
-function shapeSample(resp) {
-    if (Array.isArray(resp)) return { topLevel: 'array', length: resp.length, first: resp[0] };
-    const keys = resp && typeof resp === 'object' ? Object.keys(resp) : [];
-    const firstArrayKey = keys.find(k => Array.isArray(resp[k]));
-    const firstItem = firstArrayKey ? resp[firstArrayKey][0] : null;
-    return {
-        topLevel: 'object',
-        keys,
-        firstArrayKey,
-        firstItemKeys: firstItem && typeof firstItem === 'object' ? Object.keys(firstItem) : null,
-        firstItem,
-    };
 }
 
 async function readMarketScreen() {

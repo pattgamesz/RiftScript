@@ -37,7 +37,6 @@ function saveKnownTeamNames() {
 let userCache = null;
 let userCacheTime = 0;
 let userInFlight = null;
-let loggedUserShape = false;
 const USER_TTL_MS = 60_000;
 
 export function initPetReader() {
@@ -70,23 +69,10 @@ async function getApiPets() {
     userInFlight = (async () => {
         try {
             const resp = await api.getUser();
-            if (!loggedUserShape) {
-                loggedUserShape = true;
-                const keys = resp && typeof resp === 'object' ? Object.keys(resp) : [];
-                const petsKey = keys.find(k => /pet/i.test(k) && Array.isArray(resp[k]));
-                console.log('[RiftScript] getUser top-level keys:', keys);
-                if (petsKey) {
-                    console.log(`[RiftScript] pets found under key "${petsKey}". First entry:`, resp[petsKey][0]);
-                } else {
-                    console.log('[RiftScript] no array key matching "pet" found. Inspect response manually:', resp);
-                }
-            }
-            const list = extractPetsFromUser(resp);
-            userCache = list;
+            userCache = extractPetsFromUser(resp);
             userCacheTime = now;
             return userCache;
         } catch (e) {
-            console.warn('[RiftScript] getUser failed:', e.message);
             return userCache;
         } finally {
             userInFlight = null;
@@ -158,11 +144,6 @@ async function readPetScreen() {
             });
         });
 
-        console.log('[RiftScript pet] readPetScreen scraped pets:', pets.length,
-                    'isPetsSubTab:', isPetsSubTab,
-                    'lastPets in cache:', lastPets.length,
-                    'knownTeamNames:', [...knownTeamNames]);
-
         // Only treat the scrape as authoritative when we're actually on the
         // Pets sub-tab. Otherwise the scraped subset would overwrite our good
         // cached data with partial / mis-located pets.
@@ -205,8 +186,8 @@ async function readPetScreen() {
             lastPets = pets;
             events.emit('reader-pet', pets);
         } else if (lastPets.length) {
-            console.log('[RiftScript pet] re-emitting lastPets — team count:',
-                        lastPets.filter(p => p.location === 'team').length);
+            // DOM has no pet rows we recognise, or we're on a non-Pets sub-tab.
+            // Re-emit the last good scrape so the expedition calc keeps its data.
             events.emit('reader-pet', lastPets);
         } else {
             // No prior scrape — first load on a sub-tab without pet rows.
@@ -309,7 +290,6 @@ function parseModalPassives($modal) {
     // baked into the name; the value has the effect %.
     const passives = [];
     const seen = new Set();
-    const rawSamples = [];
     $modal.find('.row').each((_i, el) => {
         const $row = $(el);
         const text = $row.text().replace(/\s+/g, ' ').trim();
@@ -317,7 +297,6 @@ function parseModalPassives($modal) {
         // because jQuery .text() concatenates "Abilities" + "Wood 6" without
         // a space — use a plain prefix match instead of \b.
         if (/^(Health|Attack|Defense|Total|Abilities|Species)/i.test(text)) return;
-        rawSamples.push(text);
         // Require the trailing "+X%" effect — that's what distinguishes a
         // passive row from anything else in the modal.
         const m = text.match(/^([A-Za-z][A-Za-z ]+?)\s+(\d+)\s*\+?\s*(\d+(?:\.\d+)?)\s*%$/);
@@ -330,11 +309,6 @@ function parseModalPassives($modal) {
         seen.add(key);
         passives.push({ name, level, effect });
     });
-    if (passives.length === 0 && rawSamples.length) {
-        console.log('[RiftScript] no passives matched. Raw row samples:', rawSamples);
-    } else {
-        console.log('[RiftScript] passives parsed:', passives);
-    }
     return passives;
 }
 

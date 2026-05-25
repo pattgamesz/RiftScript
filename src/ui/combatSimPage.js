@@ -129,18 +129,16 @@ function triggerNav(page) {
     window.history.back();
   }
 async function openPage() {
-    console.log('[CombatSim] openPage called');
     isOpen = true;
     if ($(PAGE_TAG).length) {
       $(PAGE_TAG).remove();
     } else {
-      console.log('[CombatSim] navigating to merchant...');
+      // Navigate via the game's own router so Angular tears down its current
+      // page before we replace settings-page with the combat sim shell.
       triggerNav("merchant");
       await waitFor("merchant-page", 3000);
-      console.log('[CombatSim] merchant found, navigating to settings...');
       triggerNav("settings");
       await waitFor("settings-page", 3000);
-      console.log('[CombatSim] settings found, removing...');
       $("settings-page").remove();
     }
     $("header-component div.wrapper > div.title").text("Combat Simulator");
@@ -148,12 +146,10 @@ async function openPage() {
     $("nav-component button").removeClass("active-link");
     $(`#${NAV_ID}`).addClass("rs-nav-active");
     history.pushState({}, "", "combatsim");
-    console.log('[CombatSim] calling renderPage...');
     try {
       renderPage();
-      console.log('[CombatSim] renderPage done');
     } catch(e) {
-      console.error('[CombatSim] renderPage error:', e);
+      console.error('[RiftScript] CombatSim renderPage error:', e);
     }
   }
 function cleanupPage() {

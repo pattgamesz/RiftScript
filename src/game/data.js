@@ -188,7 +188,6 @@ export async function loadGameData() {
         // instantly, then refresh in the background.
         processRawData(cached);
         data.cached = true;
-        console.log('[RiftScript] Loaded from cache, refreshing in background…');
 
         // Fire-and-forget background refresh
         fetchFresh().then(raw => {
@@ -196,13 +195,8 @@ export async function loadGameData() {
                 processRawData(raw);
                 data.cached = false;
                 saveCache(raw);
-                console.log('[RiftScript] Background refresh complete');
-            } catch (e) {
-                console.warn('[RiftScript] Background refresh process failed:', e);
-            }
-        }).catch(e => {
-            console.warn('[RiftScript] Background refresh failed (cache still good):', e.message);
-        });
+            } catch (e) { /* keep cache */ }
+        }).catch(() => { /* keep cache */ });
         return;
     }
 
@@ -212,7 +206,6 @@ export async function loadGameData() {
         processRawData(raw);
         data.cached = false;
         saveCache(raw);
-        console.log('[RiftScript] Game data loaded fresh');
     } catch (e) {
         console.error('[RiftScript] Initial fetch failed and no cache — features limited:', e.message);
     }

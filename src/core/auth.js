@@ -34,17 +34,10 @@ function readTokenFromIndexedDB() {
 export async function initAuthInterceptor() {
     try {
         authToken = await readTokenFromIndexedDB();
-        console.log('[RiftScript] Auth token loaded');
     } catch (e) {
-        console.warn('[RiftScript] Could not read auth token:', e.message);
         // Retry after a few seconds in case Firebase hasn't written it yet
         setTimeout(async () => {
-            try {
-                authToken = await readTokenFromIndexedDB();
-                console.log('[RiftScript] Auth token loaded (retry)');
-            } catch (e2) {
-                console.warn('[RiftScript] Auth token not available:', e2.message);
-            }
+            try { authToken = await readTokenFromIndexedDB(); } catch (e2) { /* unavailable */ }
         }, 5000);
     }
 }

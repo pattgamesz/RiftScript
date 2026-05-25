@@ -12,7 +12,6 @@ let guildCache = null;
 let guildCacheTime = 0;
 let inFlight = null;
 let backoffUntil = 0;
-let loggedShape = false;
 let resetTimer = null;
 
 export function clearGuildCache() {
@@ -74,19 +73,11 @@ async function getGuildData() {
     inFlight = (async () => {
         try {
             const resp = await api.getGuild();
-            if (!loggedShape) {
-                loggedShape = true;
-                const keys = resp && typeof resp === 'object' ? Object.keys(resp) : [];
-                console.log('[RiftScript] getGuild top-level keys:', keys);
-                const guildObj = resp?.guild || resp;
-                console.log('[RiftScript] guild object keys:', guildObj && Object.keys(guildObj));
-            }
             guildCache = resp?.guild || resp;
             guildCacheTime = now;
             return guildCache;
         } catch (e) {
             backoffUntil = Date.now() + BACKOFF_MS;
-            console.warn('[RiftScript] getGuild failed, backing off 5m:', e.message);
             return guildCache;
         } finally {
             inFlight = null;
