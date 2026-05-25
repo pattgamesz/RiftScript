@@ -657,6 +657,31 @@ function renderPage() {
                                     <span>Vendor Gems (+2% Coin/2XP)</span>
                                     <label><input type="checkbox" id="cs-vendorGems" ${c.vendorGems ? "checked" : ""}> Active</label>
                                 </div>
+                                <div class="cs-toggle-row">
+                                    <span>Insatiable XP procs (+50%)</span>
+                                    <label><input type="checkbox" id="cs-insatiableXp" ${c.insatiableXpActive ? "checked" : ""}> Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Relic Effects</span></div>
+                            <div class="cs-control-grid">
+                                <div class="cs-toggle-row">
+                                    <span>Potent Relic (doubles Potent)</span>
+                                    <label><input type="checkbox" id="cs-potentRelic" ${c.potentRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Savage Relic (doubles Savage)</span>
+                                    <label><input type="checkbox" id="cs-savageRelic" ${c.savageRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Insatiable Relic (doubles Insatiable)</span>
+                                    <label><input type="checkbox" id="cs-insatiableRelic" ${c.insatiableRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Outskirts XP Relic (+24% in Outskirts)</span>
+                                    <label><input type="checkbox" id="cs-outskirtsXp" ${c.outskirtsXpActive ? "checked" : ""}> Active</label>
+                                </div>
                             </div>
                         </div>
                         <div class="cs-card">
@@ -1384,6 +1409,12 @@ function buildSimConfig(page) {
       mapState: page.find("#cs-mapState").val() || "Enabled",
       wisdomTomeActive: page.find("#cs-wisdomTomeActive").is(":checked"),
       insatiableTomeActive: page.find("#cs-insatiableTomeActive").is(":checked"),
+      // Phase 3: relic doublers, Insatiable XP procs, Outskirts XP relic.
+      potentRelicActive: page.find("#cs-potentRelic").is(":checked"),
+      savageRelicActive: page.find("#cs-savageRelic").is(":checked"),
+      insatiableRelicActive: page.find("#cs-insatiableRelic").is(":checked"),
+      insatiableXpActive: page.find("#cs-insatiableXp").is(":checked"),
+      outskirtsXpActive: page.find("#cs-outskirtsXp").is(":checked"),
     };
   }
 function runSimulation(page) {
@@ -1487,7 +1518,12 @@ function runSimulation(page) {
       mapTier: config.mapTier,
       mapState: config.mapState,
       wisdomTomeActive: config.wisdomTomeActive,
-      insatiableTomeActive: config.insatiableTomeActive
+      insatiableTomeActive: config.insatiableTomeActive,
+      potentRelicActive: config.potentRelicActive,
+      savageRelicActive: config.savageRelicActive,
+      insatiableRelicActive: config.insatiableRelicActive,
+      insatiableXpActive: config.insatiableXpActive,
+      outskirtsXpActive: config.outskirtsXpActive
     });
     const btn = page.find("#cs-run");
     btn.text("Simulating...").prop("disabled", true);
@@ -1590,6 +1626,8 @@ function runSimulation(page) {
                 ${breakdownRow("Skill XP Bonus", xpBreakdown.skillXpBonus)}
                 ${breakdownRow("Adventure XP", xpBreakdown.adventureXp)}
                 ${breakdownRow("Contract XP", xpBreakdown.contractXp)}
+                ${breakdownRow("Outskirts XP Relic", xpBreakdown.outskirtsXp)}
+                ${breakdownRow("Insatiable XP procs", xpBreakdown.insatiableXp)}
             </div>
         `);
       page.find("#cs-xp-breakdown-card").show();

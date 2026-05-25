@@ -81,14 +81,19 @@ export const MAP_MOD_OPTIONS = Object.keys(MAP_MOD_DATA);
 
 // Mirrors AY70-AY76 cells. Multipliers come from Tiers lookup, scaled per
 // mastery's per-tier coefficient (Potent ×6, Savage ×2, Insatiable ×20, etc.).
-// Wisdom Tome and the corresponding relics double the contribution.
+// Both the Wisdom Tome and the matching relic add 100% to the mastery
+// (= each toggle doubles the contribution; both active = ×3).
 //
 // Returns each mastery as a fraction (0-1). Display code may format as %.
 export function calculateMasteryMods(config) {
     const wisdomBoost = config.wisdomTomeActive ? 1 : 0;
-    const potent     = tierMod(config.potentTier)     * 6  * (1 + wisdomBoost);
-    const savage     = tierMod(config.savageTier)     * 2  * (1 + wisdomBoost);
-    const insatiable = tierMod(config.insatiableTier) * 20 * (1 + wisdomBoost);
+    const potentRelic     = config.potentRelicActive     ? 1 : 0;
+    const savageRelic     = config.savageRelicActive     ? 1 : 0;
+    const insatiableRelic = config.insatiableRelicActive ? 1 : 0;
+
+    const potent     = tierMod(config.potentTier)     * 6  * (1 + wisdomBoost + potentRelic);
+    const savage     = tierMod(config.savageTier)     * 2  * (1 + wisdomBoost + savageRelic);
+    const insatiable = tierMod(config.insatiableTier) * 20 * (1 + wisdomBoost + insatiableRelic);
     const coin       = tierMod(config.coinTier)       + (config.vendorGems ? 0.02 : 0);
     const doubleXP   = tierMod(config.doubleXPTier)   + (config.vendorGems ? 0.02 : 0);
     const lantern    = tierMod(config.lanternTier);
@@ -193,14 +198,20 @@ export function calculateXpModifiers(config) {
     const adventureXp = config.adventureMode === 't10xp' ? (config.adventureEffect || 0) : 0;
     const contractXp = config.contractActive ? (config.doubleContractTrigger || 0) : 0;
 
+    // Outskirts XP relic (sheet L92/J92): when active and in Outskirts, +24% XP.
+    const outskirtsXp = config.outskirtsXpActive && config.isOutskirts ? 24 : 0;
+
+    // Insatiable XP procs (sheet BH74): when active, XP per kill × 1.5 → +50%.
+    const insatiableXp = config.insatiableXpActive ? 50 : 0;
+
     const total = potion + brew + sigilXp + savage + activeSkill + bracelet
                 + mapXP + relicDoubleXP + trait + mark + weapon + skillXpBonus
-                + adventureXp + contractXp;
+                + adventureXp + contractXp + outskirtsXp + insatiableXp;
 
     return {
         potion, brew, sigilXp, savage, activeSkill, bracelet, mapXP,
         relicDoubleXP, trait, mark, weapon, skillXpBonus,
-        adventureXp, contractXp,
+        adventureXp, contractXp, outskirtsXp, insatiableXp,
         total,
     };
 }
