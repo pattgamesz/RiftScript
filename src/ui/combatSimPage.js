@@ -6,7 +6,8 @@ import { simulate, calculateResults } from '../features/combatCalc.js';
 import {
     calculateEfficiency, calculateXpModifiers, calculateLootModifiers,
     calculateDamageBlock, calculateConsumableCosts, calculateGuildContribution,
-    TIER_OPTIONS, SIGIL_OPTIONS, MAP_MOD_OPTIONS,
+    calculateAdventureProfit,
+    TIER_OPTIONS, SIGIL_OPTIONS, MAP_MOD_OPTIONS, ADVENTURE_PROFIT_ITEMS,
 } from '../features/modifiers.js';
 import { api } from '../core/api.js';
 import { hasAuth } from '../core/auth.js';
@@ -585,12 +586,46 @@ function renderPage() {
                             </div>
                         </div>
                         <div class="cs-card">
-                            <div class="cs-card-header"><span>Traits & Marks</span></div>
+                            <div class="cs-card-header"><span>Traits</span></div>
                             <div class="cs-control-grid">
                                 ${controlInput("Trait Efficiency", "cs-traitEfficiency", c.traitEfficiency || 0, 1, "%")}
                                 ${controlInput("Trait Loot", "cs-traitLoot", c.traitLoot || 0, 1, "%")}
                                 ${controlInput("Trait XP", "cs-traitXP", c.traitXP || 0, 1, "%")}
-                                ${controlInput("Mark Bonus", "cs-markBonus", c.markBonus || 0, 1, "%")}
+                                <div class="cs-toggle-row">
+                                    <span>Trait All Set (+1% eff)</span>
+                                    <label><input type="checkbox" id="cs-traitAllSet" ${c.traitAllSetActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Trait Region Set (+1% eff)</span>
+                                    <label><input type="checkbox" id="cs-traitRegionSet" ${c.traitRegionSetActive ? "checked" : ""}> Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Marks</span></div>
+                            <div class="cs-control-grid">
+                                <div class="cs-toggle-row">
+                                    <span>Mark Primary (+4% XP if Primary skill)</span>
+                                    <label><input type="checkbox" id="cs-markPrimary" ${c.markPrimaryActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Mark Defense (+4% XP if Defense skill)</span>
+                                    <label><input type="checkbox" id="cs-markDefense" ${c.markDefenseActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Mark Full Set (+2% eff)</span>
+                                    <label><input type="checkbox" id="cs-markFullSet" ${c.markFullSetActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Mark Region Set (+2% eff)</span>
+                                    <label><input type="checkbox" id="cs-markRegionSet" ${c.markRegionSetActive ? "checked" : ""}> Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Skill Runes</span></div>
+                            <div class="cs-control-grid">
+                                ${tierSelect("Eff Skill Rune", "cs-effSkillRuneTier", c.effSkillRuneTier)}
                             </div>
                         </div>
                         <div class="cs-card">
@@ -648,10 +683,11 @@ function renderPage() {
                                 ${tierSelect("Coin Drop",  "cs-coinTier",       c.coinTier)}
                                 ${tierSelect("Double XP",  "cs-doubleXPTier",   c.doubleXPTier)}
                                 ${tierSelect("Lantern",    "cs-lanternTier",    c.lanternTier)}
+                                ${tierSelect("Runic Tome", "cs-runicTomeTier",  c.runicTomeTier)}
                                 ${controlInput("Runic Lv.", "cs-runicLvl", c.runicLvl || 0, 1, "")}
                                 <div class="cs-toggle-row">
-                                    <span>Active Skill XP Bonus (+4%)</span>
-                                    <label><input type="checkbox" id="cs-activeSkillXp" ${c.activeSkillXpBonus ? "checked" : ""}> Active</label>
+                                    <span>Runic Mastery active</span>
+                                    <label><input type="checkbox" id="cs-runicMastery" ${c.runicMasteryActive ? "checked" : ""}> Active</label>
                                 </div>
                                 <div class="cs-toggle-row">
                                     <span>Vendor Gems (+2% Coin/2XP)</span>
@@ -679,9 +715,87 @@ function renderPage() {
                                     <label><input type="checkbox" id="cs-insatiableRelic" ${c.insatiableRelicActive ? "checked" : ""}> Active</label>
                                 </div>
                                 <div class="cs-toggle-row">
+                                    <span>Runic Relic (doubles Runic/sigil mod)</span>
+                                    <label><input type="checkbox" id="cs-runicRelic" ${c.runicRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Mark Relic (doubles Mark XP + sets)</span>
+                                    <label><input type="checkbox" id="cs-markRelic" ${c.markRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Skill Rune Relic (doubles Eff Skill Rune)</span>
+                                    <label><input type="checkbox" id="cs-skillRuneRelic" ${c.skillRuneRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Trait Effect Relic (+12% sigil traits)</span>
+                                    <label><input type="checkbox" id="cs-traitEffectRelic" ${c.traitEffectRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Split Potion Use (XP −11% / Loot +11%)</span>
+                                    <label><input type="checkbox" id="cs-splitPotionRelic" ${c.splitPotionRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
                                     <span>Outskirts XP Relic (+24% in Outskirts)</span>
                                     <label><input type="checkbox" id="cs-outskirtsXp" ${c.outskirtsXpActive ? "checked" : ""}> Active</label>
                                 </div>
+                                <div class="cs-toggle-row">
+                                    <span>Region Rune Mastery (+75% loot)</span>
+                                    <label><input type="checkbox" id="cs-regionRuneMasteryRelic" ${c.regionRuneMasteryRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Elite Rune Effect (+48% on Elite runes)</span>
+                                    <label><input type="checkbox" id="cs-eliteRuneRelic" ${c.eliteRuneRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Reduced Monster HP (+8%)</span>
+                                    <label><input type="checkbox" id="cs-reducedMonsterHpRelic" ${c.reducedMonsterHealthRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Uncapped Accuracy (+8%)</span>
+                                    <label><input type="checkbox" id="cs-uncappedAccRelic" ${c.uncappedAccuracyRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Uncapped Evasion (+8%)</span>
+                                    <label><input type="checkbox" id="cs-uncappedEvaRelic" ${c.uncappedEvasionRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Preserve Relics</span></div>
+                            <div class="cs-control-grid">
+                                <div class="cs-toggle-row">
+                                    <span>Preserve Food (+8%)</span>
+                                    <label><input type="checkbox" id="cs-preserveFoodRelic" ${c.preserveFoodRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Preserve Potion (+8%)</span>
+                                    <label><input type="checkbox" id="cs-preservePotionRelic" ${c.preservePotionRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Preserve Sigil (+8%)</span>
+                                    <label><input type="checkbox" id="cs-preserveSigilRelic" ${c.preserveSigilRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                                <div class="cs-toggle-row">
+                                    <span>Preserve Contract (+100%)</span>
+                                    <label><input type="checkbox" id="cs-preserveContractRelic" ${c.preserveContractRelicActive ? "checked" : ""}> Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <div class="cs-card-header"><span>Adventure Profit</span></div>
+                            <div class="cs-control-grid">
+                                <div style="font-size:0.75em;opacity:0.6;padding:8px 16px">Enter rates per kill from your Adventure planner. Same-Tier / Same-Tier-XP / Off-Tier per item.</div>
+                                ${ADVENTURE_PROFIT_ITEMS.map(item => {
+                                    const r = (c.adventureRates && c.adventureRates[item]) || {};
+                                    return `
+                                    <div class="cs-control-row" style="display:grid;grid-template-columns:1fr repeat(3,60px);gap:6px;align-items:center">
+                                        <span>${item}</span>
+                                        <input class="cs-input cs-adv-rate" data-item="${item}" data-kind="sameTier" type="number" placeholder="ST" value="${r.sameTier || ''}" step="0.01" title="Same-Tier rate">
+                                        <input class="cs-input cs-adv-rate" data-item="${item}" data-kind="sameTierXp" type="number" placeholder="STxp" value="${r.sameTierXp || ''}" step="0.01" title="Same-Tier XP rate">
+                                        <input class="cs-input cs-adv-rate" data-item="${item}" data-kind="offTier" type="number" placeholder="OT" value="${r.offTier || ''}" step="0.01" title="Off-Tier rate">
+                                    </div>
+                                    `;
+                                }).join('')}
                             </div>
                         </div>
                         <div class="cs-card">
@@ -795,6 +909,10 @@ function renderPage() {
                     <div class="cs-card" id="cs-guild-contrib-card" style="display:none">
                         <div class="cs-card-header"><span>Guild Contribution</span></div>
                         <div id="cs-guild-contrib-body"></div>
+                    </div>
+                    <div class="cs-card" id="cs-adv-profit-card" style="display:none">
+                        <div class="cs-card-header"><span>Adventure Profit</span></div>
+                        <div id="cs-adv-profit-body"></div>
                     </div>
                 </div>
 
@@ -1425,7 +1543,47 @@ function buildSimConfig(page) {
       insatiableRelicActive: page.find("#cs-insatiableRelic").is(":checked"),
       insatiableXpActive: page.find("#cs-insatiableXp").is(":checked"),
       outskirtsXpActive: page.find("#cs-outskirtsXp").is(":checked"),
+      // Phase 6: complete sheet port — marks, traits, runic, skill runes,
+      // and all remaining relic toggles.
+      markPrimaryActive: page.find("#cs-markPrimary").is(":checked"),
+      markDefenseActive: page.find("#cs-markDefense").is(":checked"),
+      markFullSetActive: page.find("#cs-markFullSet").is(":checked"),
+      markRegionSetActive: page.find("#cs-markRegionSet").is(":checked"),
+      markRelicActive: page.find("#cs-markRelic").is(":checked"),
+      traitAllSetActive: page.find("#cs-traitAllSet").is(":checked"),
+      traitRegionSetActive: page.find("#cs-traitRegionSet").is(":checked"),
+      effSkillRuneTier: page.find("#cs-effSkillRuneTier").val() || "None",
+      runicTomeTier: page.find("#cs-runicTomeTier").val() || "None",
+      runicMasteryActive: page.find("#cs-runicMastery").is(":checked"),
+      runicRelicActive: page.find("#cs-runicRelic").is(":checked"),
+      skillRuneRelicActive: page.find("#cs-skillRuneRelic").is(":checked"),
+      traitEffectRelicActive: page.find("#cs-traitEffectRelic").is(":checked"),
+      splitPotionRelicActive: page.find("#cs-splitPotionRelic").is(":checked"),
+      regionRuneMasteryRelicActive: page.find("#cs-regionRuneMasteryRelic").is(":checked"),
+      eliteRuneRelicActive: page.find("#cs-eliteRuneRelic").is(":checked"),
+      reducedMonsterHealthRelicActive: page.find("#cs-reducedMonsterHpRelic").is(":checked"),
+      uncappedAccuracyRelicActive: page.find("#cs-uncappedAccRelic").is(":checked"),
+      uncappedEvasionRelicActive: page.find("#cs-uncappedEvaRelic").is(":checked"),
+      preserveFoodRelicActive: page.find("#cs-preserveFoodRelic").is(":checked"),
+      preservePotionRelicActive: page.find("#cs-preservePotionRelic").is(":checked"),
+      preserveSigilRelicActive: page.find("#cs-preserveSigilRelic").is(":checked"),
+      preserveContractRelicActive: page.find("#cs-preserveContractRelic").is(":checked"),
+      adventureRates: readAdventureRates(page),
     };
+  }
+
+function readAdventureRates(page) {
+    const rates = {};
+    page.find('.cs-adv-rate').each(function() {
+        const $el = $(this);
+        const item = $el.data('item');
+        const kind = $el.data('kind');
+        const v = parseFloat($el.val());
+        if (!v) return;
+        if (!rates[item]) rates[item] = {};
+        rates[item][kind] = v;
+    });
+    return rates;
   }
 function runSimulation(page) {
     if (!selectedActionId) {
@@ -1534,7 +1692,32 @@ function runSimulation(page) {
       savageRelicActive: config.savageRelicActive,
       insatiableRelicActive: config.insatiableRelicActive,
       insatiableXpActive: config.insatiableXpActive,
-      outskirtsXpActive: config.outskirtsXpActive
+      outskirtsXpActive: config.outskirtsXpActive,
+      // Phase 6 fields
+      markPrimaryActive: config.markPrimaryActive,
+      markDefenseActive: config.markDefenseActive,
+      markFullSetActive: config.markFullSetActive,
+      markRegionSetActive: config.markRegionSetActive,
+      markRelicActive: config.markRelicActive,
+      traitAllSetActive: config.traitAllSetActive,
+      traitRegionSetActive: config.traitRegionSetActive,
+      effSkillRuneTier: config.effSkillRuneTier,
+      runicTomeTier: config.runicTomeTier,
+      runicMasteryActive: config.runicMasteryActive,
+      runicRelicActive: config.runicRelicActive,
+      skillRuneRelicActive: config.skillRuneRelicActive,
+      traitEffectRelicActive: config.traitEffectRelicActive,
+      splitPotionRelicActive: config.splitPotionRelicActive,
+      regionRuneMasteryRelicActive: config.regionRuneMasteryRelicActive,
+      eliteRuneRelicActive: config.eliteRuneRelicActive,
+      reducedMonsterHealthRelicActive: config.reducedMonsterHealthRelicActive,
+      uncappedAccuracyRelicActive: config.uncappedAccuracyRelicActive,
+      uncappedEvasionRelicActive: config.uncappedEvasionRelicActive,
+      preserveFoodRelicActive: config.preserveFoodRelicActive,
+      preservePotionRelicActive: config.preservePotionRelicActive,
+      preserveSigilRelicActive: config.preserveSigilRelicActive,
+      preserveContractRelicActive: config.preserveContractRelicActive,
+      adventureRates: config.adventureRates
     });
     const btn = page.find("#cs-run");
     btn.text("Simulating...").prop("disabled", true);
@@ -1549,9 +1732,16 @@ function runSimulation(page) {
       const lootModBreakdown = calculateLootModifiers(config);
       const dmgBreakdown = calculateDamageBlock(config);
 
+      // Insatiable mastery becomes a per-hit proc rate in the simulator
+      // (mastery.insatiable / 20 ≈ chance per successful hit). Disabled if
+      // the flat XP-procs toggle isn't on, so users have a single control.
+      const masteryInsatiable = (effBreakdown.insatiable || 0) / 100 / 12.5; // unwind eff factor
+      const insatiableProcRate = config.insatiableXpActive ? masteryInsatiable / 20 : 0;
+
       const sim = simulate({
         ...config,
         efficiency: effBreakdown.total,
+        insatiableProcRate,
       });
       const results = calculateResults({
         ...config,
@@ -1561,7 +1751,8 @@ function runSimulation(page) {
       const fmt = (n) => formatNumber(Math.round(n));
       const consumableCosts = calculateConsumableCosts(config, sim.finalKPH, sim.foodPerHour);
       const guildContrib = calculateGuildContribution(sim.finalKPH, config.simHours, config.guildEventActive);
-      const fullProfit = results.lootPerHour - consumableCosts.total;
+      const advProfit = calculateAdventureProfit(config, sim.finalKPH);
+      const fullProfit = results.lootPerHour - consumableCosts.total + advProfit.total;
       page.find("#cs-result-hero").html(`
             <div class="cs-hero-number">${fmt(sim.finalKPH)}</div>
             <div class="cs-hero-label">kills / hour</div>
@@ -1606,33 +1797,34 @@ function runSimulation(page) {
       page.find("#cs-eff-breakdown-body").html(`
             <div class="cs-breakdown">
                 <div class="cs-breakdown-total">Total Efficiency: ${formatNumber(effBreakdown.total)}%</div>
-                ${breakdownRow("Primary Level", effBreakdown.level)}
+                ${breakdownRow("Primary Level (0.25%/lvl)", effBreakdown.level)}
                 ${breakdownRow("Guild (Library + Event Hall)", effBreakdown.guild)}
                 ${breakdownRow("Ring / Equipment", effBreakdown.ring)}
                 ${breakdownRow("Efficiency Relic", effBreakdown.effRune)}
                 ${breakdownRow("Insatiable (active)", effBreakdown.insatiable)}
                 ${breakdownRow("Trait", effBreakdown.trait)}
-                ${breakdownRow("Marks", effBreakdown.marks)}
+                ${breakdownRow("Mark Sets (Full+Region) × Mark Relic", effBreakdown.markSets)}
+                ${breakdownRow("Trait Sets (All+Region)", effBreakdown.traitSets)}
                 ${breakdownRow("Region Rune Mastery", effBreakdown.regionRuneMastery)}
                 ${breakdownRow("Extra Double Action", effBreakdown.extraDoubleAction)}
                 ${breakdownRow("Potion Multi-Kill", effBreakdown.potionMultiKill)}
                 ${breakdownRow("Sigil + Runic", effBreakdown.sigilEff)}
+                ${breakdownRow("Eff Skill Rune × Insatiable × Skill Rune Relic", effBreakdown.effSkillRune)}
             </div>
         `);
       page.find("#cs-eff-breakdown-card").show();
       page.find("#cs-xp-breakdown-body").html(`
             <div class="cs-breakdown">
                 <div class="cs-breakdown-total">Total XP Bonus: ${formatNumber(xpBreakdown.total)}%</div>
-                ${breakdownRow("Potion (× Potent)", xpBreakdown.potion)}
+                ${breakdownRow("Potion (× Potent × SplitPotion)", xpBreakdown.potion)}
                 ${breakdownRow("Brew", xpBreakdown.brew)}
-                ${breakdownRow("Sigil + Runic", xpBreakdown.sigilXp)}
+                ${breakdownRow("Sigil + Runic × TraitRelic", xpBreakdown.sigilXp)}
                 ${breakdownRow("Savage Mastery", xpBreakdown.savage)}
-                ${breakdownRow("Active Skill", xpBreakdown.activeSkill)}
+                ${breakdownRow("Mark XP × Mark Relic", xpBreakdown.markXp)}
                 ${breakdownRow("Bracelet / Equipment", xpBreakdown.bracelet)}
                 ${breakdownRow("Active Map XP", xpBreakdown.mapXP)}
                 ${breakdownRow("Double XP Relic", xpBreakdown.relicDoubleXP)}
-                ${breakdownRow("Trait", xpBreakdown.trait)}
-                ${breakdownRow("Mark", xpBreakdown.mark)}
+                ${breakdownRow("Trait XP", xpBreakdown.trait)}
                 ${breakdownRow("Weapon", xpBreakdown.weapon)}
                 ${breakdownRow("Skill XP Bonus", xpBreakdown.skillXpBonus)}
                 ${breakdownRow("Adventure XP", xpBreakdown.adventureXp)}
@@ -1647,11 +1839,12 @@ function runSimulation(page) {
             <div class="cs-breakdown">
                 <div class="cs-breakdown-total">Total Loot Bonus: ${formatNumber(lootModBreakdown.total)}%</div>
                 ${breakdownRow("Amulet / Equipment", lootModBreakdown.amulet)}
-                ${breakdownRow("Potion (× Potent)", lootModBreakdown.potion)}
+                ${breakdownRow("Potion (× Potent × SplitPotion)", lootModBreakdown.potion)}
                 ${breakdownRow("Active Map Loot", lootModBreakdown.mapLoot)}
                 ${breakdownRow("Trait", lootModBreakdown.trait)}
                 ${breakdownRow("Adventure Loot", lootModBreakdown.adventureLoot)}
                 ${breakdownRow("Coin Drop Mastery", lootModBreakdown.coinMastery)}
+                ${breakdownRow("Region Rune Mastery Relic", lootModBreakdown.regionRuneMastery)}
             </div>
         `);
       page.find("#cs-loot-mod-breakdown-card").show();
@@ -1697,6 +1890,20 @@ function runSimulation(page) {
         page.find("#cs-guild-contrib-card").show();
       } else {
         page.find("#cs-guild-contrib-card").hide();
+      }
+      if (advProfit.items.length > 0) {
+        const rows = advProfit.items
+            .map(it => `<div class="cs-cost-row"><span>${it.name}</span><span class="${it.profit >= 0 ? 'cs-positive' : 'cs-negative'}">${fmt(it.profit)}g/hr</span></div>`)
+            .join('');
+        page.find("#cs-adv-profit-body").html(`
+                <div class="cs-breakdown">
+                    <div class="cs-cost-total ${advProfit.total >= 0 ? 'cs-positive' : 'cs-negative'}">Adventure Profit: ${fmt(advProfit.total)}g/hr</div>
+                    ${rows}
+                </div>
+            `);
+        page.find("#cs-adv-profit-card").show();
+      } else {
+        page.find("#cs-adv-profit-card").hide();
       }
       page.find("#cs-ttl-card").show();
       updateTTL(page, results.xpPerHour);

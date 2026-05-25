@@ -74,14 +74,26 @@ export function simulate(config) {
     let playerDefeats = 0;
     let healsUsed = 0;
 
+    // Insatiable proc rate (fraction 0-1+). Sheet sInsatiableRate / 20 maps the
+    // mastery's per-hour bias into a per-hit chance. T8 + Wisdom + Relic = 24%.
+    const insatiableProcRate = (config.insatiableProcRate || 0);
+
     while (currentTime < simulationTime) {
         // Player attacks
         if (playerAttackTimer <= 0) {
             if (prng() < player.accuracy) {
                 const baseDamage = player.attack * (1 + player.damageIncrease) * (1 - monster.damageReduction);
-                const randomMultiplier = prng() * 0.25 + 0.75;
-                const actualDamage = baseDamage * randomMultiplier * regionAdvantage;
-                monster.currentHealth -= actualDamage;
+                const dmg = () => baseDamage * (prng() * 0.25 + 0.75) * regionAdvantage;
+                monster.currentHealth -= dmg();
+
+                // Insatiable: roll extra hits until a miss. Each extra hit still
+                // checks accuracy. Capped at 4 to avoid infinite loops on tier-8+
+                // configurations with stacked relics.
+                let procs = 0;
+                while (insatiableProcRate > 0 && procs < 4 && prng() < insatiableProcRate) {
+                    procs++;
+                    if (prng() < player.accuracy) monster.currentHealth -= dmg();
+                }
             }
             playerAttackTimer = player.attackDelay;
         }
