@@ -77,3 +77,23 @@ export function debounce(fn, delay) {
         timer = setTimeout(() => fn(...args), delay);
     };
 }
+
+// HTML / regex escaping
+const HTML_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+export function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => HTML_ESCAPE[c]);
+}
+export const escapeAttr = escapeHtml;
+
+export function escapeRegex(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Mobile breakpoint for panels that reposition on small screens.
+export const MOBILE_BREAKPOINT = 750;
+
+// Try fn now and after delay(s) — used to catch Angular component mounts that
+// finish slightly after our page event fires.
+export function retryAfter(fn, delays = [200, 800]) {
+    for (const ms of delays) setTimeout(fn, ms);
+}

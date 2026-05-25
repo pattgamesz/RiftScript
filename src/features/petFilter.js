@@ -9,7 +9,7 @@ import { trigger as triggerPetReader } from '../game/petReader.js';
 import { data } from '../game/data.js';
 import { get as gget, set as gset, getOnDefault } from '../core/settings.js';
 import { getPetStats, getCachedCount } from '../core/petStats.js';
-import { formatNumber } from '../core/util.js';
+import { formatNumber, escapeHtml, MOBILE_BREAKPOINT, retryAfter } from '../core/util.js';
 import { getExpeditionResults, scrapeRotationsFromDOM } from './expeditionCalc.js';
 
 const PANEL_ID = 'rs-pet-panel';
@@ -20,7 +20,6 @@ const PERFECT_KEY = 'pet-only-perfect';
 const TAB_KEY = 'pet-active-tab';
 const EXP_WEEK_KEY = 'pet-exp-week-offset';
 const EXP_TIER_KEY = 'pet-exp-selected-tier';
-const MOBILE_BREAKPOINT = 750;
 
 let activeTab = 'manager'; // 'manager' | 'expedition'
 
@@ -54,8 +53,7 @@ function onPage(page) {
         $(`#${PANEL_ID}`).remove();
         return;
     }
-    setTimeout(ensurePanel, 200);
-    setTimeout(ensurePanel, 800);
+    retryAfter(ensurePanel);
 }
 
 function ensurePanel() {
@@ -323,41 +321,32 @@ function renderExpeditionTab() {
     `;
 }
 
-function applyToList(pets) {
-    if (!pets?.length) return;
-    const family = gget(FAMILY_KEY, 'All');
-    const dup = !!gget(DUP_KEY); // default off
-    const sort = gget(SORT_KEY, 'default');
+// Composite key avoids confusion when two pets share name+species+level (breeders).
+const petKey = (p) => `${p.name}|${p.species}|${p.level}|${p.groupIndex || 0}`;
 
-    // Attach stats — prefer live data from getUser API (truly unique pet ID),
-    // fall back to modal-scrape cache for pets the API doesn't expose.
-    for (const pet of pets) {
-        pet.cachedStats = pet.apiStats || getPetStats(pet);
-    }
+// Duplicate fingerprint: family + H/A/D + sorted passive set.
+function fingerprintOf(p) {
+    const s = p.cachedStats;
+    if (!s || s.health == null) return null;
+    const passives = Array.isArray(s.passives)
+        ? s.passives.filter(x => x?.name).map(x => `${x.name}|${x.level || 0}`).sort().join(',')
+        : '';
+    return `${p.family}|${Math.round(s.health)}|${Math.round(s.attack)}|${Math.round(s.defense)}|${passives}`;
+}
 
-    // Duplicate detection: same family + same H/A/D + same passive set.
-    // (Family alone is what the family filter already shows, so we want
-    // stricter "true duplicate" detection here.)
-    const fingerprintCount = {};
-    const fingerprintOf = (p) => {
-        const s = p.cachedStats;
-        if (!s || s.health == null) return null;
-        const passives = Array.isArray(s.passives)
-            ? s.passives.filter(x => x?.name).map(x => `${x.name}|${x.level || 0}`).sort().join(',')
-            : '';
-        return `${p.family}|${Math.round(s.health)}|${Math.round(s.attack)}|${Math.round(s.defense)}|${passives}`;
-    };
+function countFingerprints(pets) {
+    const out = {};
     for (const p of pets) {
         const fp = fingerprintOf(p);
-        if (!fp) continue;
-        fingerprintCount[fp] = (fingerprintCount[fp] || 0) + 1;
+        if (fp) out[fp] = (out[fp] || 0) + 1;
     }
+    return out;
+}
 
-    // Best per family — highest total stats first, tiebreak on level-4 passive count.
-    // Composite key avoids confusion when two pets share a name (breeders).
-    const petKey = (p) => `${p.name}|${p.species}|${p.level}|${p.groupIndex || 0}`;
-    const bestPerFamily = {};
-    const familyScores = {};
+// Best per family — highest total, tiebreak on count of level-4 (non-hunger) passives.
+function computeBestPerFamily(pets) {
+    const best = {};
+    const scores = {};
     for (const p of pets) {
         const s = p.cachedStats;
         if (!s || s.health == null) continue;
@@ -366,144 +355,154 @@ function applyToList(pets) {
         if (Array.isArray(s.passives)) {
             for (const pp of s.passives) {
                 if (!pp) continue;
-                const isMax = (pp.level || 0) >= 4;
-                const isNegative = /hunger/i.test(pp.name || '');
-                if (isMax && !isNegative) maxTier++;
+                if ((pp.level || 0) >= 4 && !/hunger/i.test(pp.name || '')) maxTier++;
             }
         }
-        const cur = familyScores[p.family];
-        const better = !cur
-            || total > cur.total
-            || (total === cur.total && maxTier > cur.maxTier);
-        if (better) {
-            familyScores[p.family] = { total, maxTier };
-            bestPerFamily[p.family] = petKey(p);
+        const cur = scores[p.family];
+        if (!cur || total > cur.total || (total === cur.total && maxTier > cur.maxTier)) {
+            scores[p.family] = { total, maxTier };
+            best[p.family] = petKey(p);
         }
     }
+    return best;
+}
 
-    // Per-stat best per family for individual stat highlights
-    const statBestPerFamily = {}; // {family: {health: maxValue, attack:..., defense:...}}
+// Per-stat best per family — used for green "best" highlight on individual chips.
+function computeStatBestPerFamily(pets) {
+    const out = {};
     for (const p of pets) {
         const s = p.cachedStats;
         if (!s) continue;
-        if (!statBestPerFamily[p.family]) statBestPerFamily[p.family] = {};
+        if (!out[p.family]) out[p.family] = {};
         for (const k of ['health', 'attack', 'defense']) {
             const v = s[k] || 0;
-            if (v > (statBestPerFamily[p.family][k] || 0)) statBestPerFamily[p.family][k] = v;
+            if (v > (out[p.family][k] || 0)) out[p.family][k] = v;
         }
     }
+    return out;
+}
 
+function applyToList(pets) {
+    if (!pets?.length) return;
+    const family = gget(FAMILY_KEY, 'All');
+    const dup = !!gget(DUP_KEY);
+    const sort = gget(SORT_KEY, 'default');
     const onlyPerfect = !!gget(PERFECT_KEY);
 
-    // Apply per-pet visuals
+    // Attach stats — prefer getUser API (unique per pet ID), fall back to modal-scrape cache.
+    for (const pet of pets) pet.cachedStats = pet.apiStats || getPetStats(pet);
+
+    const fingerprintCount = countFingerprints(pets);
+    const bestPerFamily = computeBestPerFamily(pets);
+    const statBestPerFamily = computeStatBestPerFamily(pets);
+
     for (const pet of pets) {
-        const $el = pet.element;
-        $el.removeClass('rs-pet-duplicate rs-pet-best rs-pet-release-row');
-        $el.find('.rs-pet-chip, .rs-pet-best-star, .rs-pet-additions, .rs-pet-release').remove();
-        // Strip any previous "perfect total" highlight from the game's % chip
-        $el.find('.tags > *').removeClass('rs-pet-chip-best-perfect');
-
-        // Family filter only on the main collection
-        if (pet.location === 'collection') {
-            const visible = family === 'All' || pet.family === family;
-            $el.css('display', visible ? '' : 'none');
-        } else {
-            $el.css('display', '');
-        }
-
-        if (dup && pet.location === 'collection') {
-            const fp = fingerprintOf(pet);
-            if (fp && fingerprintCount[fp] > 1) $el.addClass('rs-pet-duplicate');
-        }
-
-        // Inject chips alongside the game's existing .tags (Ore/Fish/etc.).
-        const s = pet.cachedStats;
-        if (s && (s.health != null || s.attack != null || s.defense != null)) {
-            const fbest = statBestPerFamily[pet.family] || {};
-            const total = s.total != null ? s.total : ((s.health || 0) + (s.attack || 0) + (s.defense || 0));
-            const isPerfect = total >= 300;
-            const $tags = $el.find('.tags').first();
-            const gameTagClass = detectTagClass($tags);
-
-            // The game already shows total % in its own .tags row (e.g. "196%").
-            // Highlight that existing chip when the roll is perfect (300%).
-            if (isPerfect && $tags.length) {
-                const $totalChip = $tags.children().filter(function() {
-                    const t = $(this).text().trim();
-                    return /^\d+(\.\d+)?\s*%$/.test(t);
-                }).last();
-                if ($totalChip.length) $totalChip.addClass('rs-pet-chip-best-perfect');
-            }
-
-            const $target = $tags.length ? $tags : $el.find('.image').next();
-            if ($target.length) {
-                // All of our additions (H/A/D + passives) go on a single row
-                // below the game's own tag row. When "only perfect" is on,
-                // we skip non-perfect chips and track whether anything got
-                // through so we can mark release candidates.
-                let html = '';
-                let hasKeeper = false;
-
-                const renderStat = (letter, value, isBest) => {
-                    if (value == null) return;
-                    const isPerfectStat = value === 100;
-                    if (onlyPerfect && !isPerfectStat) return;
-                    if (isPerfectStat) hasKeeper = true;
-                    html += statChip(letter, value, isBest || isPerfectStat, gameTagClass);
-                };
-                renderStat('H', s.health, isPerfect || s.health === fbest.health);
-                renderStat('A', s.attack, isPerfect || s.attack === fbest.attack);
-                renderStat('D', s.defense, isPerfect || s.defense === fbest.defense);
-
-                if (Array.isArray(s.passives)) {
-                    for (const p of s.passives) {
-                        if (!p?.name) continue;
-                        const isMaxTier = (p.level || 0) >= 4;
-                        const isNegative = /hunger/i.test(p.name);
-                        const isPerfectPassive = isMaxTier && !isNegative;
-                        if (onlyPerfect && !isPerfectPassive) continue;
-                        if (isPerfectPassive) hasKeeper = true;
-                        html += passiveChip(p, gameTagClass);
-                    }
-                }
-
-                if (html) {
-                    const $additions = $(`<div class="rs-pet-additions">${html}</div>`);
-                    if ($tags.length) $tags.after($additions);
-                    else $target.append($additions);
-                }
-
-                // Release candidate marker — only in onlyPerfect mode, only
-                // for collection pets (don't mark team/ranch).
-                if (onlyPerfect && !hasKeeper && pet.location === 'collection') {
-                    $el.addClass('rs-pet-release-row');
-                    $el.find('.image').first().append(
-                        `<span class="rs-pet-release" title="No perfect stats — release candidate">✕</span>`
-                    );
-                }
-            }
-        }
-
-        // Best-in-family star (composite key handles same-name pets)
-        if (bestPerFamily[pet.family] === petKey(pet) && pet.location === 'collection') {
-            $el.addClass('rs-pet-best');
-            if (!$el.find('.rs-pet-best-star').length) {
-                $el.find('.image').first().append(
-                    `<span class="rs-pet-best-star" title="Best in family">★</span>`
-                );
-            }
-        }
+        decoratePet(pet, { family, dup, onlyPerfect, fingerprintCount, bestPerFamily, statBestPerFamily });
     }
 
-    // Sort via CSS `order` so the DOM order itself is never mutated. This
-    // keeps groupIndex stable across sorts/filters — critical for breeders
-    // with multiple same-name pets where we disambiguate by position.
+    // Sort via CSS `order` so DOM order stays stable — critical for breeders
+    // where groupIndex disambiguates same-name pets.
     const collectionPets = pets.filter(p => p.location === 'collection');
     if (sort === 'default') {
         for (const p of collectionPets) p.element.css('order', '');
     } else {
-        const sorted = sortPets(collectionPets, sort);
-        sorted.forEach((p, i) => p.element.css('order', i));
+        sortPets(collectionPets, sort).forEach((p, i) => p.element.css('order', i));
+    }
+}
+
+function decoratePet(pet, ctx) {
+    const $el = pet.element;
+    $el.removeClass('rs-pet-duplicate rs-pet-best rs-pet-release-row');
+    $el.find('.rs-pet-chip, .rs-pet-best-star, .rs-pet-additions, .rs-pet-release').remove();
+    $el.find('.tags > *').removeClass('rs-pet-chip-best-perfect');
+
+    // Family filter applies only to the main collection
+    if (pet.location === 'collection') {
+        $el.css('display', ctx.family === 'All' || pet.family === ctx.family ? '' : 'none');
+    } else {
+        $el.css('display', '');
+    }
+
+    if (ctx.dup && pet.location === 'collection') {
+        const fp = fingerprintOf(pet);
+        if (fp && ctx.fingerprintCount[fp] > 1) $el.addClass('rs-pet-duplicate');
+    }
+
+    const s = pet.cachedStats;
+    if (s && (s.health != null || s.attack != null || s.defense != null)) {
+        injectStatAndPassiveChips(pet, s, ctx);
+    }
+
+    if (ctx.bestPerFamily[pet.family] === petKey(pet) && pet.location === 'collection') {
+        $el.addClass('rs-pet-best');
+        if (!$el.find('.rs-pet-best-star').length) {
+            $el.find('.image').first().append(
+                `<span class="rs-pet-best-star" title="Best in family">★</span>`
+            );
+        }
+    }
+}
+
+function injectStatAndPassiveChips(pet, s, ctx) {
+    const $el = pet.element;
+    const $tags = $el.find('.tags').first();
+    const gameTagClass = detectTagClass($tags);
+    const fbest = ctx.statBestPerFamily[pet.family] || {};
+    const total = s.total != null ? s.total : ((s.health || 0) + (s.attack || 0) + (s.defense || 0));
+    const isPerfect = total >= 300;
+
+    // The game already shows total % in its own .tags (e.g. "196%"). Highlight that
+    // existing chip when the roll is perfect (300%).
+    if (isPerfect && $tags.length) {
+        const $totalChip = $tags.children().filter(function() {
+            return /^\d+(\.\d+)?\s*%$/.test($(this).text().trim());
+        }).last();
+        if ($totalChip.length) $totalChip.addClass('rs-pet-chip-best-perfect');
+    }
+
+    const $target = $tags.length ? $tags : $el.find('.image').next();
+    if (!$target.length) return;
+
+    // Build a single additions row under the game's tags. In "only perfect"
+    // mode, non-perfect chips are skipped and we track whether anything was
+    // emitted so collection pets can be marked as release candidates.
+    let html = '';
+    let hasKeeper = false;
+
+    const renderStat = (letter, value, isBest) => {
+        if (value == null) return;
+        const isPerfectStat = value === 100;
+        if (ctx.onlyPerfect && !isPerfectStat) return;
+        if (isPerfectStat) hasKeeper = true;
+        html += statChip(letter, value, isBest || isPerfectStat, gameTagClass);
+    };
+    renderStat('H', s.health, isPerfect || s.health === fbest.health);
+    renderStat('A', s.attack, isPerfect || s.attack === fbest.attack);
+    renderStat('D', s.defense, isPerfect || s.defense === fbest.defense);
+
+    if (Array.isArray(s.passives)) {
+        for (const p of s.passives) {
+            if (!p?.name) continue;
+            const isMaxTier = (p.level || 0) >= 4;
+            const isNegative = /hunger/i.test(p.name);
+            const isPerfectPassive = isMaxTier && !isNegative;
+            if (ctx.onlyPerfect && !isPerfectPassive) continue;
+            if (isPerfectPassive) hasKeeper = true;
+            html += passiveChip(p, gameTagClass);
+        }
+    }
+
+    if (html) {
+        const $additions = $(`<div class="rs-pet-additions">${html}</div>`);
+        if ($tags.length) $tags.after($additions);
+        else $target.append($additions);
+    }
+
+    if (ctx.onlyPerfect && !hasKeeper && pet.location === 'collection') {
+        $el.addClass('rs-pet-release-row');
+        $el.find('.image').first().append(
+            `<span class="rs-pet-release" title="No perfect stats — release candidate">✕</span>`
+        );
     }
 }
 
@@ -549,11 +548,5 @@ function passiveChip(passive, gameTagClass) {
     const isMaxTier = !isNegative && (passive.level || 0) >= 4;
     const extra = (isNegative ? ' rs-pet-chip-negative' : '') + (isMaxTier ? ' rs-pet-chip-tier-max' : '');
     const cls = `${gameTagClass} rs-pet-chip rs-pet-chip-passive${extra}`.trim();
-    return `<div class="${cls}" title="${esc(tooltip)}">${esc(label)}</div>`;
-}
-
-function esc(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
+    return `<div class="${cls}" title="${escapeHtml(tooltip)}">${escapeHtml(label)}</div>`;
 }

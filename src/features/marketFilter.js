@@ -3,13 +3,17 @@ import * as events from '../core/events.js';
 import { trigger as triggerMarketReader } from '../game/marketReader.js';
 import { loadRiftMembers, isRiftMember, getMemberInfo, getMemberCount } from '../core/riftMembers.js';
 import { data } from '../game/data.js';
-import { formatNumber } from '../core/util.js';
+import { formatNumber, escapeHtml, escapeAttr, escapeRegex, MOBILE_BREAKPOINT, retryAfter } from '../core/util.js';
 import { getQuests as getGuildQuests, scheduleResetRefresh, formatTimeRemaining, nextDailyReset } from './guildQuests.js';
 
 const PANEL_ID = 'rs-market-panel';
 const FILTERS_KEY = 'riftscript_market_filters_v1';
 const RIFT_MODE_KEY = 'riftscript_market_rift_mode_v1';
 const CURRENT_KEY = 'riftscript_market_current_v1';
+
+// Ratio = listing price ÷ vendor sell price. Lower = better deal.
+const RATIO_GOOD_MAX = 3;
+const RATIO_NEUTRAL_MAX = 5;
 
 // Preset categories. Each maps to a "target" item name; conversions are
 // resolved at runtime via data.drops + data.actions + data.ingredients.
@@ -112,8 +116,7 @@ function onPage(page) {
     currentFilter = { type: 'None', amount: 0, search: '', tribute: null };
     writeJSON(CURRENT_KEY, currentFilter);
     setMarketSearch('');
-    setTimeout(ensurePanel, 200);
-    setTimeout(ensurePanel, 800);
+    retryAfter(ensurePanel);
     // Pre-fetch guild quests so the tab count shows up immediately
     loadQuestsAndRender();
 }
@@ -150,8 +153,6 @@ function getTypeConversions(typeKey) {
 }
 
 // ─── Panel ──────────────────────────────────────────────────
-
-const MOBILE_BREAKPOINT = 750;
 
 function ensurePanel() {
     const $component = $('market-listings-component');
@@ -509,89 +510,64 @@ function applyToListings(marketData) {
     for (const l of marketData.listings) clearListingDecor(l.element);
     if (isOwnTab) return;
 
-    // ── Tribute filtering: vendor price (info) + ratio = listingPrice / vendorPrice
     let kept = marketData.listings;
-    if (currentFilter.tribute && TRIBUTES[currentFilter.tribute]) {
-        const matcher = TRIBUTES[currentFilter.tribute].match;
-        const matching = [];
-        for (const l of marketData.listings) {
-            const item = data.items?.byId?.[l.item];
-            if (!item || !matcher(item)) continue;
-            l.vendorPrice = item.attributes?.SELL_PRICE || 0;
-            l.ratio = l.vendorPrice > 0 ? l.price / l.vendorPrice : Infinity;
-            matching.push(l);
-        }
-        // Sort by ratio ascending (closer to floor = better) for SELL; reverse for BUY
-        const dir = marketData.type === 'BUY' ? -1 : 1;
-        matching.sort((a, b) => dir * (a.ratio - b.ratio));
-        const limited = currentFilter.amount > 0
-            ? matching.slice(0, currentFilter.amount)
-            : matching;
-        const keepSet = new Set(limited);
-
-        for (const l of marketData.listings) {
-            if (!keepSet.has(l)) {
-                l.element.hide();
-                continue;
-            }
-            if (l.vendorPrice) addValueChip(l.element, l.vendorPrice);
-            if (Number.isFinite(l.ratio)) addRatioChip(l.element, l.ratio, ratioClass(l.ratio));
-        }
-        reorderListings(limited);
-        kept = limited;
+    const tributeMatcher = currentFilter.tribute && TRIBUTES[currentFilter.tribute]?.match;
+    if (tributeMatcher) {
+        kept = filterByMembership(marketData, item => tributeMatcher(item));
     }
-
-    // ── Preset Type filtering: same ratio metric as tribute (vs MIN_MARKET_PRICE) ──
     const typeActive = currentFilter.type && currentFilter.type !== 'None';
     if (typeActive) {
         const conv = getTypeConversions(currentFilter.type);
-        if (conv) {
-            const matching = [];
-            for (const l of marketData.listings) {
-                if (!conv[l.item]) continue; // membership: must be in this Type
-                const item = data.items?.byId?.[l.item];
-                if (!item) continue;
-                l.vendorPrice = item.attributes?.SELL_PRICE || 0;
-                l.ratio = l.vendorPrice > 0 ? l.price / l.vendorPrice : Infinity;
-                matching.push(l);
-            }
-            const dir = marketData.type === 'BUY' ? -1 : 1;
-            matching.sort((a, b) => dir * (a.ratio - b.ratio));
-
-            const limited = currentFilter.amount > 0
-                ? matching.slice(0, currentFilter.amount)
-                : matching;
-            const keepSet = new Set(limited);
-
-            for (const l of marketData.listings) {
-                if (!keepSet.has(l)) { l.element.hide(); continue; }
-                if (l.vendorPrice) addValueChip(l.element, l.vendorPrice);
-                if (Number.isFinite(l.ratio)) addRatioChip(l.element, l.ratio, ratioClass(l.ratio));
-            }
-            reorderListings(limited);
-            kept = limited;
-        }
+        if (conv) kept = filterByMembership(marketData, (_, listing) => !!conv[listing.item]);
     }
 
-    // ── Rift members: highlight or exclusive ──
-    if (riftMode !== 'off' && memberCount) {
-        for (const listing of kept) {
-            const isRift = listing.seller && isRiftMember(listing.seller);
-            if (riftMode === 'exclusive') {
-                listing.element.toggle(!!isRift);
-            }
-            if (isRift) {
-                listing.element.addClass('rs-rift-listing');
-                const info = getMemberInfo(listing.seller);
-                const guildLabel = info?.guildName || 'Rift';
-                if (!listing.element.find('.rs-rift-badge').length) {
-                    const $amount = listing.element.find('.amount').first();
-                    const badge = `<span class="rs-rift-badge" title="${escapeAttr(guildLabel)}">★</span>`;
-                    if ($amount.length) $amount.after(badge);
-                    else listing.element.find('.name').first().after(badge);
-                }
-            }
-        }
+    if (riftMode !== 'off' && memberCount) applyRiftHighlight(kept);
+}
+
+// `match(item, listing)` returns true if the listing belongs in the active filter.
+// Decorates kept listings with value + ratio chips, hides the rest, reorders by ratio,
+// and returns the kept listings (possibly empty).
+function filterByMembership(marketData, match) {
+    const matching = [];
+    for (const l of marketData.listings) {
+        const item = data.items?.byId?.[l.item];
+        if (!item) continue;
+        if (!match(item, l)) continue;
+        l.vendorPrice = item.attributes?.SELL_PRICE || 0;
+        l.ratio = l.vendorPrice > 0 ? l.price / l.vendorPrice : Infinity;
+        matching.push(l);
+    }
+    // SELL: lower ratio = better deal (ascending). BUY: reverse.
+    const dir = marketData.type === 'BUY' ? -1 : 1;
+    matching.sort((a, b) => dir * (a.ratio - b.ratio));
+
+    const limited = currentFilter.amount > 0
+        ? matching.slice(0, currentFilter.amount)
+        : matching;
+    const keepSet = new Set(limited);
+
+    for (const l of marketData.listings) {
+        if (!keepSet.has(l)) { l.element.hide(); continue; }
+        if (l.vendorPrice) addValueChip(l.element, l.vendorPrice);
+        if (Number.isFinite(l.ratio)) addRatioChip(l.element, l.ratio, ratioClass(l.ratio));
+    }
+    reorderListings(limited);
+    return limited;
+}
+
+function applyRiftHighlight(listings) {
+    for (const listing of listings) {
+        const isRift = listing.seller && isRiftMember(listing.seller);
+        if (riftMode === 'exclusive') listing.element.toggle(!!isRift);
+        if (!isRift) continue;
+        listing.element.addClass('rs-rift-listing');
+        if (listing.element.find('.rs-rift-badge').length) continue;
+        const info = getMemberInfo(listing.seller);
+        const guildLabel = info?.guildName || 'Rift';
+        const badge = `<span class="rs-rift-badge" title="${escapeAttr(guildLabel)}">★</span>`;
+        const $amount = listing.element.find('.amount').first();
+        if ($amount.length) $amount.after(badge);
+        else listing.element.find('.name').first().after(badge);
     }
 }
 
@@ -607,8 +583,8 @@ function addRatioChip($el, ratio, colorClass = '') {
 }
 
 function ratioClass(ratio) {
-    if (ratio <= 3) return 'rs-ratio-good';
-    if (ratio <= 5) return 'rs-ratio-neutral';
+    if (ratio <= RATIO_GOOD_MAX) return 'rs-ratio-good';
+    if (ratio <= RATIO_NEUTRAL_MAX) return 'rs-ratio-neutral';
     return 'rs-ratio-bad';
 }
 
@@ -663,18 +639,4 @@ function writeJSON(key, value) {
     try {
         localStorage.setItem(key, JSON.stringify(value));
     } catch (e) { /* quota */ }
-}
-
-function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-}
-
-function escapeAttr(s) {
-    return escapeHtml(s);
-}
-
-function escapeRegex(s) {
-    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -1,6 +1,7 @@
 // Injects RiftScript button into the game's left nav and manages pages
 import * as events from '../core/events.js';
 import * as storage from '../core/storage.js';
+import * as settings from '../core/settings.js';
 import { getMode } from '../game/mode.js';
 import { getDiscordUser, isLinked, openOAuth, unlinkDiscord, setTimer } from '../features/discord.js';
 import { openCombatSimPage } from './combatSimPage.js';
@@ -11,28 +12,12 @@ const PAGE_TAG = 'riftscript-page';
 let isOpen = false;
 let activeMenu = 'info';
 
-// ─── Global settings (not mode-scoped) ──────────────────────
-const GLOBAL_PREFIX = 'riftscript_global_';
-
-function globalGet(name) {
-    try {
-        const raw = localStorage.getItem(GLOBAL_PREFIX + name);
-        return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
-}
-
-function globalSet(name, value) {
-    try {
-        localStorage.setItem(GLOBAL_PREFIX + name, JSON.stringify(value));
-    } catch (e) { /* quota */ }
-}
-
 function migrateUISettings() {
     // Migrate old mode-scoped UI settings to global keys
     for (const key of ['ui-changes', 'recipe-clickthrough']) {
-        if (globalGet(key) != null) continue;
+        if (settings.get(key) != null) continue;
         const old = storage.getData(key);
-        if (old != null) globalSet(key, old);
+        if (old != null) settings.set(key, old);
     }
 }
 
@@ -50,7 +35,7 @@ const UI_SECTIONS = [
 const UI_SELECTOR = `:is(${UI_SECTIONS})`;
 
 function applyUIChanges() {
-    const enabled = globalGet('ui-changes');
+    const enabled = settings.get('ui-changes');
     const existing = document.getElementById(UI_CHANGES_ID);
     if (enabled && !existing) {
         document.documentElement.style.setProperty('--gap', '10px');
@@ -180,7 +165,7 @@ export function initMenu() {
             }
             isOpen = false;
         }
-        if (page.type === 'action' && globalGet('recipe-clickthrough')) {
+        if (page.type === 'action' && settings.get('recipe-clickthrough')) {
             setTimeout(applyRecipeClickthrough, 200);
         }
     });
@@ -284,31 +269,65 @@ function waitForElement(selector, timeout = 2000) {
 
 // ─── Render ──────────────────────────────────────────────────
 
-function renderPage() {
-    $(PAGE_TAG).remove();
+const MENU_TABS = [
+    { id: 'info',     label: 'Info' },
+    { id: 'settings', label: 'Settings' },
+    { id: 'combat',   label: 'Combat Calc' },
+    { id: 'discord',  label: 'Discord' },
+    { id: 'prices',   label: 'Custom Prices' },
+];
 
-    const mode = getMode();
-    const modeLabel = mode === 'multiplayer' ? 'Multiplayer' : 'Singleplayer';
+function renderInfoCard() {
+    const modeLabel = getMode() === 'multiplayer' ? 'Multiplayer' : 'Singleplayer';
+    return `
+        <div class="rs-card">
+            <div class="rs-card-header">RiftScript</div>
+            <div class="rs-row"><span>Version</span><span>${RIFTSCRIPT_VERSION}${RIFTSCRIPT_DEV ? ' [DEV]' : ''}</span></div>
+            <div class="rs-row"><span>Game Mode</span><span>${modeLabel}</span></div>
+            <div class="rs-row"><span>Made by</span><span>Patt</span></div>
+            <div class="rs-row"><span>Website</span><span><a href="https://rift-guild.com" target="_blank" style="color:#4a9eff;text-decoration:none">rift-guild.com</a></span></div>
+            <div class="rs-row"><span>Script based on</span><span>ironwood-scripts by Pancake</span></div>
+            <div class="rs-row"><span>Combat Sim based on</span><span>spreadsheet by Rivea</span></div>
+        </div>
+    `;
+}
+
+function renderCombatCard() {
+    return `
+        <div class="rs-card">
+            <div class="rs-card-header">Combat Simulator</div>
+            <div class="rs-row">
+                <span>Full combat sandbox with simulation, loot breakdown, and time to level.</span>
+                <button class="rs-btn rs-btn-primary" id="rs-open-combatsim">Open Simulator</button>
+            </div>
+        </div>
+    `;
+}
+
+function renderPricesCard() {
     const customPrices = storage.getData('custom-prices');
     const priceCount = customPrices ? Object.keys(customPrices).length : 0;
+    const body = priceCount > 0 ? `
+        <div class="rs-row">
+            <span>You have ${priceCount} custom price${priceCount !== 1 ? 's' : ''}</span>
+            <button class="rs-btn rs-btn-danger" id="rs-reset-prices">Reset All</button>
+        </div>
+    ` : `
+        <div class="rs-row"><span style="opacity:0.4">No custom prices set. Edit prices on the Items tab.</span></div>
+    `;
+    return `
+        <div class="rs-card">
+            <div class="rs-card-header">Custom Prices</div>
+            ${body}
+        </div>
+    `;
+}
 
-    const page = $(`
-        <${PAGE_TAG}>
-            <div class="rs-layout">
-                <div class="rs-col-left">
-                    ${activeMenu === 'info' ? `
-                        <div class="rs-card">
-                            <div class="rs-card-header">RiftScript</div>
-                            <div class="rs-row"><span>Version</span><span>${RIFTSCRIPT_VERSION}${RIFTSCRIPT_DEV ? ' [DEV]' : ''}</span></div>
-                            <div class="rs-row"><span>Game Mode</span><span>${modeLabel}</span></div>
-                            <div class="rs-row"><span>Made by</span><span>Patt</span></div>
-                            <div class="rs-row"><span>Website</span><span><a href="https://rift-guild.com" target="_blank" style="color:#4a9eff;text-decoration:none">rift-guild.com</a></span></div>
-                            <div class="rs-row"><span>Script based on</span><span>ironwood-scripts by Pancake</span></div>
-                            <div class="rs-row"><span>Combat Sim based on</span><span>spreadsheet by Rivea</span></div>
-                        </div>
-                        <div class="rs-card">
-                            <div class="rs-card-header">Changelog</div>
-                            <div class="rs-changelog">
+function renderChangelogCard() {
+    return `
+        <div class="rs-card">
+            <div class="rs-card-header">Changelog</div>
+            <div class="rs-changelog">
                                 <div class="rs-changelog-section">v1.4.0</div>
                                 <ul>
                                     <li><b>Pet Manager</b> on the Taming page — inline H/A/D + passive chips on every pet (click once to cache), best-in-family ★ marker, exact duplicate detection, "Only perfect stats" filter, family + sort options</li>
@@ -455,44 +474,40 @@ function renderPage() {
                                     <li>Discord linking moved to its own tab with privacy info</li>
                                     <li>Project is now open source: <a href="https://github.com/pattgamesz/RiftScript" target="_blank" style="color:#4a9eff;text-decoration:none">github.com/pattgamesz/RiftScript</a></li>
                                 </ul>
-                            </div>
-                        </div>
-                    ` : ''}
-                    ${activeMenu === 'settings' ? renderSettingsCard() : ''}
-                    ${activeMenu === 'combat' ? `
-                        <div class="rs-card">
-                            <div class="rs-card-header">Combat Simulator</div>
-                            <div class="rs-row">
-                                <span>Full combat sandbox with simulation, loot breakdown, and time to level.</span>
-                                <button class="rs-btn rs-btn-primary" id="rs-open-combatsim">Open Simulator</button>
-                            </div>
-                        </div>
-                    ` : ''}
-                    ${activeMenu === 'discord' ? renderDiscordCard() : ''}
-                    ${activeMenu === 'prices' ? `
-                        <div class="rs-card">
-                            <div class="rs-card-header">Custom Prices</div>
-                            ${priceCount > 0 ? `
-                                <div class="rs-row">
-                                    <span>You have ${priceCount} custom price${priceCount !== 1 ? 's' : ''}</span>
-                                    <button class="rs-btn rs-btn-danger" id="rs-reset-prices">Reset All</button>
-                                </div>
-                            ` : `
-                                <div class="rs-row"><span style="opacity:0.4">No custom prices set. Edit prices on the Items tab.</span></div>
-                            `}
-                        </div>
-                    ` : ''}
-                </div>
-                <div class="rs-col-right">
-                    <div class="rs-card">
-                        <div class="rs-card-header">Menu</div>
-                        <button class="rs-menu-btn ${activeMenu === 'info' ? 'active' : ''}" data-menu="info">Info</button>
-                        <button class="rs-menu-btn ${activeMenu === 'settings' ? 'active' : ''}" data-menu="settings">Settings</button>
-                        <button class="rs-menu-btn ${activeMenu === 'combat' ? 'active' : ''}" data-menu="combat">Combat Calc</button>
-                        <button class="rs-menu-btn ${activeMenu === 'discord' ? 'active' : ''}" data-menu="discord">Discord</button>
-                        <button class="rs-menu-btn ${activeMenu === 'prices' ? 'active' : ''}" data-menu="prices">Custom Prices</button>
-                    </div>
-                </div>
+            </div>
+        </div>
+    `;
+}
+
+const TAB_RENDERERS = {
+    info: () => renderInfoCard() + renderChangelogCard(),
+    settings: renderSettingsCard,
+    combat: renderCombatCard,
+    discord: renderDiscordCard,
+    prices: renderPricesCard,
+};
+
+function renderMenuSidebar() {
+    const buttons = MENU_TABS
+        .map(t => `<button class="rs-menu-btn ${activeMenu === t.id ? 'active' : ''}" data-menu="${t.id}">${t.label}</button>`)
+        .join('');
+    return `
+        <div class="rs-card">
+            <div class="rs-card-header">Menu</div>
+            ${buttons}
+        </div>
+    `;
+}
+
+function renderPage() {
+    $(PAGE_TAG).remove();
+
+    const tabContent = (TAB_RENDERERS[activeMenu] || (() => ''))();
+    const page = $(`
+        <${PAGE_TAG}>
+            <div class="rs-layout">
+                <div class="rs-col-left">${tabContent}</div>
+                <div class="rs-col-right">${renderMenuSidebar()}</div>
             </div>
         </${PAGE_TAG}>
     `);
@@ -509,18 +524,18 @@ function renderPage() {
     });
 
     page.find('#rs-ui-changes').on('change', function() {
-        globalSet('ui-changes', $(this).is(':checked'));
+        settings.set('ui-changes', $(this).is(':checked'));
         applyUIChanges();
     });
 
     page.find('#rs-recipe-clickthrough').on('change', function() {
-        globalSet('recipe-clickthrough', $(this).is(':checked'));
+        settings.set('recipe-clickthrough', $(this).is(':checked'));
         applyRecipeClickthrough();
     });
 
     page.find('.rs-feature-toggle').on('change', function() {
         const key = $(this).data('key');
-        globalSet(key, $(this).is(':checked'));
+        settings.set(key, $(this).is(':checked'));
     });
 
     page.find('#rs-discord-link').on('click', () => openOAuth());
@@ -558,10 +573,10 @@ function renderPage() {
 // ─── Settings Card ───────────────────────────────────────────
 
 function renderSettingsCard() {
-    const uiChanges = globalGet('ui-changes');
-    const recipeClickthrough = globalGet('recipe-clickthrough');
+    const uiChanges = settings.get('ui-changes');
+    const recipeClickthrough = settings.get('recipe-clickthrough');
     const setting = (key, label, desc, defaultOn = false) => {
-        const stored = globalGet(key);
+        const stored = settings.get(key);
         const checked = stored === null ? defaultOn : !!stored;
         return `
             <div class="rs-row rs-setting-row">
@@ -605,7 +620,7 @@ function renderSettingsCard() {
                     <span class="rs-setting-desc">Plays a short beep when your current action stops (you become idle). Off by default.</span>
                 </div>
                 <label class="rs-toggle">
-                    <input type="checkbox" class="rs-feature-toggle" data-key="idle-beep" ${globalGet('idle-beep') ? 'checked' : ''}>
+                    <input type="checkbox" class="rs-feature-toggle" data-key="idle-beep" ${settings.get('idle-beep') ? 'checked' : ''}>
                     <span class="rs-toggle-slider"></span>
                 </label>
             </div>
