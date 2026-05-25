@@ -3,13 +3,18 @@ import { getAuthToken } from './auth.js';
 import { gmFetch } from './request.js';
 import { getMode } from '../game/mode.js';
 
-const API_ROOT = 'https://iwrpg.vectordungeon.com';
+// All public game data is served from our own Firebase Hosting — we don't
+// hit any third-party data API at runtime. Dev builds read from the dev
+// channel so new data files can be tested before going to prod.
+const API_HOSTED = (typeof RIFTSCRIPT_DEV !== 'undefined' && RIFTSCRIPT_DEV)
+    ? 'https://rift-script--dev-y8m8gvy1.web.app/data'
+    : 'https://rift-script.web.app/data';
 const API_AUTH_ROOT = 'https://api-2.ironwoodrpg.com';
 
-function fetchJSON(path) {
-    return gmFetch(`${API_ROOT}/${path}`, {
-        headers: { 'Content-Type': 'application/json' }
-    });
+async function fetchJSON(path) {
+    const headers = { 'Content-Type': 'application/json' };
+    const file = path.split('/').pop() + '.json';
+    return gmFetch(`${API_HOSTED}/${file}`, { headers, retries: 2 });
 }
 
 function fetchAuth(path) {
@@ -47,4 +52,6 @@ export const api = {
 
     // Authenticated endpoints (uses intercepted game token)
     getUser:             () => fetchAuth('getUser'),
+    getMarketItems:      () => fetchAuth('getMarketItems'),
+    getGuild:            () => fetchAuth('getGuild'),
 };

@@ -85,6 +85,7 @@ const CSS = `
     font-size: 0.85em;
 }
 .rs-value {
+    flex: 0 0 140px;
     text-align: right;
     color: #fff;
     font-size: 0.85em;
@@ -109,11 +110,18 @@ const CSS = `
     letter-spacing: 0.5px;
 }
 
-/* Middle column for inputs */
+/* Middle column for inputs — fixed width so inputs always align */
 .rs-mid {
-    flex: 1;
+    flex: 0 0 170px;
     display: flex;
-    justify-content: center;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+.rs-loot-item-name {
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.45);
+    white-space: nowrap;
 }
 .rs-goal-result {
     display: flex;
@@ -121,8 +129,9 @@ const CSS = `
     align-items: flex-end;
 }
 
-/* Goal input */
-.rs-goal-input {
+/* Goal inputs */
+.rs-goal-input,
+.rs-loot-goal-input {
     all: unset;
     width: 44px;
     padding: 4px 6px;
@@ -134,10 +143,10 @@ const CSS = `
     text-align: center;
     box-sizing: border-box;
 }
-.rs-goal-input:focus {
+.rs-goal-input:focus,
+.rs-loot-goal-input:focus {
     border-color: #4a9eff;
 }
-
 /* Item price input */
 .rs-item-value {
     gap: 2px;
@@ -496,6 +505,679 @@ riftscript-page .rs-row:last-child {
 }
 .rs-toggle input:checked + .rs-toggle-slider::before {
     transform: translateX(16px);
+}
+
+/* ─── Market Filter Panel ─────────────────────────────── */
+.rs-market-panel {
+    background: #172033;
+    border: 1px solid #2a3a50;
+    border-radius: 4px;
+    margin-top: var(--gap, 12px);
+    margin-bottom: var(--gap, 12px);
+    overflow: hidden;
+    font-size: 0.9em;
+}
+.rs-mp-tabs {
+    display: flex;
+    border-bottom: 1px solid #2a3a50;
+}
+.rs-mp-tab {
+    all: unset;
+    flex: 1;
+    padding: 10px 0;
+    text-align: center;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+.rs-mp-tab:hover { color: rgba(255,255,255,0.8); }
+.rs-mp-tab.active {
+    color: #fff;
+    border-bottom-color: #4a9eff;
+}
+.rs-mp-count {
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(74,158,255,0.2);
+    color: #4a9eff;
+    font-size: 0.75em;
+}
+.rs-mp-body {
+    padding: 4px 0;
+}
+.rs-mp-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    gap: 8px;
+    color: rgba(255,255,255,0.7);
+}
+.rs-mp-label {
+    font-size: 0.9em;
+    color: rgba(255,255,255,0.7);
+}
+.rs-mp-hint {
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.4);
+}
+.rs-mp-divider {
+    margin: 4px 14px;
+    border-top: 1px dashed rgba(255,255,255,0.08);
+}
+.rs-mp-select {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    outline: none;
+    cursor: pointer;
+}
+.rs-mp-select:focus { border-color: #4a9eff; }
+.rs-mp-select option {
+    background: #1a1a2e;
+    color: #fff;
+}
+.rs-mp-input {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    width: 80px;
+    text-align: right;
+    outline: none;
+}
+.rs-mp-input:focus { border-color: #4a9eff; }
+.rs-ratio-chip {
+    display: inline-block;
+    margin-left: 6px;
+    margin-right: 8px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(74,158,255,0.15);
+    color: #4a9eff;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+.rs-value-chip {
+    display: inline-block;
+    margin-left: 6px;
+    margin-right: 8px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(251,191,36,0.15);
+    color: #fbbf24;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+.rs-ratio-good {
+    background: rgba(74,222,128,0.18) !important;
+    color: #4ade80 !important;
+}
+.rs-ratio-neutral {
+    background: rgba(251,146,60,0.18) !important;
+    color: #fb923c !important;
+}
+.rs-ratio-bad {
+    background: rgba(248,113,113,0.18) !important;
+    color: #f87171 !important;
+}
+.rs-mp-hint-row {
+    padding: 0 14px 8px;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.78em;
+    line-height: 1.4;
+    font-style: italic;
+}
+.rs-mp-select optgroup {
+    background: #1a1a2e;
+    color: rgba(255,255,255,0.4);
+    font-style: normal;
+    font-weight: 600;
+}
+.rs-mp-btn {
+    all: unset;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(74,158,255,0.18);
+    color: #4a9eff;
+    text-align: center;
+}
+.rs-mp-btn:hover { background: rgba(74,158,255,0.28); }
+.rs-mp-btn:disabled { opacity: 0.5; cursor: default; }
+.rs-mp-btn-warning {
+    background: rgba(251,191,36,0.18);
+    color: #fbbf24;
+}
+.rs-mp-btn-warning:hover { background: rgba(251,191,36,0.28); }
+.rs-mp-btn-danger {
+    background: rgba(248,113,113,0.18);
+    color: #f87171;
+    padding: 4px 8px;
+    min-width: 20px;
+}
+.rs-mp-btn-danger:hover { background: rgba(248,113,113,0.28); }
+.rs-mp-empty {
+    padding: 14px;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.85em;
+    text-align: center;
+    font-style: italic;
+}
+.rs-mp-saved-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 14px;
+    border-top: 2px solid transparent;
+}
+.rs-mp-saved-row .rs-mp-apply {
+    flex: 1;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rs-mp-drag-handle {
+    cursor: grab;
+    color: rgba(255,255,255,0.3);
+    padding: 0 4px;
+    user-select: none;
+    font-size: 1em;
+    line-height: 1;
+}
+.rs-mp-drag-handle:active {
+    cursor: grabbing;
+}
+.rs-mp-dragging {
+    opacity: 0.4;
+}
+.rs-mp-drag-over {
+    border-top-color: #4a9eff !important;
+}
+
+/* ─── Market competition dots ─────────────────────────── */
+.rs-market-competition {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-right: 6px;
+    display: inline-block;
+    vertical-align: middle;
+}
+.rs-market-competition-warning { background-color: #fbbf24; }
+.rs-market-competition-danger  { background-color: #f87171; }
+
+/* ─── Price buttons in listing modal ──────────────────── */
+.rs-price-btns {
+    display: flex;
+    gap: 6px;
+    margin: 6px 0;
+}
+.rs-price-btn {
+    all: unset;
+    padding: 4px 10px;
+    background: rgba(74,158,255,0.18);
+    color: #4a9eff;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+}
+.rs-price-btn:hover { background: rgba(74,158,255,0.28); }
+
+/* ─── Target Amount button ─────────────────────────────── */
+.rs-target-btn {
+    background-color: #fbbf24 !important;
+    margin-right: 8px;
+}
+.rs-target-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ─── Listing limit warning ───────────────────────────── */
+.rs-listing-limit-warning {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin: 8px 0;
+    background: rgba(251,191,36,0.12);
+    border: 1px solid rgba(251,191,36,0.3);
+    border-radius: 6px;
+    color: #fbbf24;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+.rs-listing-limit-icon {
+    font-size: 1.1em;
+}
+
+/* ─── Pet panel + duplicate highlight ─────────────────── */
+.rs-pet-panel {
+    margin: var(--gap, 12px) 0;
+}
+.rs-pet-panel-card {
+    background: #172033;
+    border: 1px solid #2a3a50;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.rs-pet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.9em;
+    border-bottom: 1px solid #2a3a50;
+}
+.rs-pet-tabs {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #2a3a50;
+}
+.rs-pet-tab {
+    all: unset;
+    flex: 1;
+    padding: 10px 0;
+    text-align: center;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+    font-size: 0.9em;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+.rs-pet-tab:hover { color: rgba(255,255,255,0.8); }
+.rs-pet-tab.active {
+    color: #fff;
+    border-bottom-color: #4a9eff;
+}
+.rs-pet-hint-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 14px 4px;
+}
+.rs-pet-hint-row .rs-pet-hint {
+    padding: 0;
+    flex: 1;
+}
+.rs-pet-hint-row .rs-pet-cache {
+    font-size: 0.78em;
+    color: rgba(74,158,255,0.85);
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding-top: 1px;
+}
+.rs-exp-team {
+    padding: 8px 14px;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.85em;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.rs-exp-team strong {
+    color: #fff;
+}
+.rs-pet-cache {
+    font-size: 0.78em;
+    color: rgba(74,158,255,0.85);
+    font-weight: 500;
+}
+.rs-pet-hint {
+    padding: 6px 14px 4px;
+    font-size: 0.75em;
+    color: rgba(255,255,255,0.45);
+    font-style: italic;
+    line-height: 1.4;
+}
+.rs-pet-select {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    outline: none;
+    cursor: pointer;
+}
+.rs-pet-select option {
+    background: #1a1a2e;
+    color: #fff;
+}
+/* Pet stat chips — match the game's tag styling exactly so they sit
+   inline naturally next to Ore/Fish/% tags. Reference:
+   border-radius:4px, padding:2px 6px, border:1px solid #263849,
+   font-size:14px, color:#aaa. */
+.rs-pet-chip {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 6px;
+    border: 1px solid #263849;
+    background: transparent;
+    font-size: 14px;
+    color: #aaa;
+    margin-left: 4px;
+    margin-top: 2px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+.rs-pet-chip-best,
+.rs-pet-chip-best-perfect {
+    border-color: #4ade80 !important;
+    color: #4ade80 !important;
+}
+.rs-pet-chip-passive {
+    color: rgba(255,255,255,0.55);
+    border-color: rgba(255,255,255,0.1);
+}
+/* Max-tier passive (level 4) gets the green highlight. Lower tiers use the
+   default passive styling. */
+.rs-pet-chip-tier-max {
+    color: #4ade80 !important;
+    border-color: #4ade80 !important;
+}
+/* Negative passives (Hunger) — always red regardless of tier */
+.rs-pet-chip-negative {
+    color: #f87171 !important;
+    border-color: #f87171 !important;
+}
+/* Second row container for our added chips (H/A/D + passives), sits below
+   the game's .tags row. */
+.rs-pet-additions {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.rs-pet-additions .rs-pet-chip {
+    margin-left: 0;
+    margin-top: 0;
+}
+.rs-pet-best-star {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    color: #fbbf24;
+    font-size: 1.1em;
+    text-shadow: 0 0 4px rgba(251,191,36,0.8);
+    pointer-events: none;
+}
+.rs-pet-release {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    color: #f87171;
+    font-size: 1.2em;
+    font-weight: 800;
+    text-shadow: 0 0 4px rgba(248,113,113,0.9);
+    pointer-events: none;
+}
+.rs-pet-release-row {
+    opacity: 0.6;
+}
+.rs-pet-release-row .image {
+    position: relative;
+}
+.rs-pet-best .image {
+    position: relative;
+}
+.rs-pet-legend {
+    border-top: 1px dashed rgba(255,255,255,0.08);
+    margin-top: 4px;
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.rs-pet-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75em;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.4;
+}
+.rs-pet-legend-row > span:last-child {
+    flex: 1;
+    min-width: 0;
+}
+.rs-pet-legend-row .rs-pet-chip {
+    margin-left: 0;
+    flex-shrink: 0;
+}
+.rs-pet-legend-row .rs-pet-legend-star,
+.rs-pet-legend-row .rs-pet-legend-dup {
+    flex-shrink: 0;
+}
+.rs-pet-legend-star {
+    color: #fbbf24;
+    font-size: 1em;
+    text-shadow: 0 0 4px rgba(251,191,36,0.6);
+}
+.rs-pet-legend-dup {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    box-shadow: inset 0 0 4px 0 rgba(251,191,36,0.7);
+    background: rgba(251,191,36,0.08);
+}
+.rs-pet-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+}
+.rs-pet-label {
+    font-size: 0.9em;
+    color: rgba(255,255,255,0.75);
+}
+.rs-pet-family {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 0.85em;
+    outline: none;
+    cursor: pointer;
+}
+.rs-pet-duplicate {
+    box-shadow: inset 0 0 8px 0 rgba(251,191,36,0.6) !important;
+}
+
+/* ─── Expedition calculator panel ─────────────────────── */
+.rs-exp-panel {
+    background: #172033;
+    border: 1px solid #2a3a50;
+    border-radius: 4px;
+    margin-top: var(--gap, 12px);
+    margin-bottom: var(--gap, 12px);
+    overflow: hidden;
+}
+.rs-exp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.9em;
+    border-bottom: 1px solid #2a3a50;
+}
+.rs-exp-team-stats {
+    font-size: 0.78em;
+    color: rgba(74,158,255,0.85);
+    font-weight: 500;
+}
+.rs-exp-empty {
+    padding: 14px;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.85em;
+    text-align: center;
+    font-style: italic;
+}
+.rs-exp-list {
+    display: flex;
+    flex-direction: column;
+}
+.rs-exp-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 14px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.85em;
+}
+.rs-exp-row:first-child { border-top: none; }
+.rs-exp-tier {
+    font-weight: 700;
+    color: rgba(255,255,255,0.55);
+}
+.rs-exp-name {
+    color: rgba(255,255,255,0.85);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rs-exp-rot {
+    font-size: 0.75em;
+    color: rgba(255,255,255,0.45);
+    text-transform: capitalize;
+    padding: 1px 6px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+}
+.rs-exp-chance {
+    font-weight: 700;
+    min-width: 56px;
+    text-align: right;
+}
+.rs-exp-good .rs-exp-chance { color: #4ade80; }
+.rs-exp-mid  .rs-exp-chance { color: #fbbf24; }
+.rs-exp-bad  .rs-exp-chance { color: #f87171; }
+
+.rs-exp-detail-block {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    margin-top: 4px;
+}
+.rs-exp-detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 14px;
+    font-size: 0.85em;
+    color: rgba(255,255,255,0.7);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.rs-exp-detail-label { color: rgba(255,255,255,0.55); }
+.rs-exp-detail-value { color: #fff; font-weight: 500; }
+.rs-exp-chance-good { color: #4ade80 !important; }
+.rs-exp-chance-mid  { color: #fbbf24 !important; }
+.rs-exp-chance-bad  { color: #f87171 !important; }
+.rs-pet-section-header {
+    padding: 10px 14px 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    margin-top: 4px;
+}
+.rs-exp-drop-list {
+    padding-bottom: 4px;
+}
+
+/* ─── Guild Quests panel ──────────────────────────────── */
+.rs-gq-panel {
+    background: #172033;
+    border: 1px solid #2a3a50;
+    border-radius: 4px;
+    margin-top: var(--gap, 12px);
+    margin-bottom: var(--gap, 12px);
+    overflow: hidden;
+    font-size: 0.9em;
+}
+.rs-gq-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    color: #fff;
+    font-weight: 600;
+    border-bottom: 1px solid #2a3a50;
+}
+.rs-gq-count {
+    font-size: 0.85em;
+    color: rgba(255,255,255,0.5);
+    font-weight: 500;
+}
+.rs-gq-timer {
+    font-size: 0.78em;
+    color: #fbbf24;
+    font-weight: 500;
+}
+.rs-gq-empty {
+    padding: 14px;
+    color: rgba(255,255,255,0.4);
+    font-size: 0.85em;
+    text-align: center;
+    font-style: italic;
+}
+.rs-gq-list {
+    display: flex;
+    flex-direction: column;
+}
+.rs-gq-quest {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.85);
+    font-size: 0.9em;
+}
+.rs-gq-quest:first-child { border-top: none; }
+.rs-gq-quest:hover {
+    background: rgba(74,158,255,0.08);
+    color: #fff;
+}
+.rs-gq-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 8px;
+}
+.rs-gq-need {
+    font-size: 0.8em;
+    color: #fbbf24;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+/* Rift member marker on market listings — just a star, no row highlight */
+.rs-rift-badge {
+    display: inline-block;
+    color: #fbbf24;
+    font-size: 1em;
+    margin-left: 8px;
+    margin-right: 4px;
+    text-shadow: 0 0 4px rgba(251,191,36,0.6);
 }
 
 /* Combat Calculator Inputs */

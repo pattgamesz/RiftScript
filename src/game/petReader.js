@@ -1,0 +1,309 @@
+// Reads the player's pet collection from the Taming → Pets page.
+// Emits 'reader-pet' with a list of {species, family, name, level, location, element}.
+// Also watches for pet detail modals to scrape per-pet stats into our cache.
+import * as events from '../core/events.js';
+import { parseNumber } from '../core/util.js';
+import { data } from './data.js';
+import { setPetStats } from '../core/petStats.js';
+import { api } from '../core/api.js';
+import { hasAuth } from '../core/auth.js';
+
+let inProgress = false;
+let modalObserver = null;
+let lastReadModalEl = null;
+let lastPets = [];           // last emitted pet list (for modal -> groupIndex lookup)
+let lastClickedRow = null;   // DOM element the user just clicked
+let knownTeamNames = new Set(); // cached across sub-tab navigation
+
+// getUser cache — contains the player's pets with unique IDs + stats
+let userCache = null;
+let userCacheTime = 0;
+let userInFlight = null;
+let loggedUserShape = false;
+const USER_TTL_MS = 60_000;
+
+export function initPetReader() {
+    events.on('page', () => trigger());
+    $(document).on('click', 'taming-page button, taming-page .tab', () => setTimeout(trigger, 200));
+
+    // Track which exact pet row the user clicked so we can attribute modal data
+    // back to the right pet (matters for breeders with many same-name pets).
+    $(document).on('mousedown click', 'taming-page button.row', function() {
+        lastClickedRow = this;
+    });
+
+    // Watch for pet detail modals appearing anywhere in the DOM
+    modalObserver = new MutationObserver(() => maybeReadModal());
+    modalObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+export function trigger() {
+    const page = events.last('page');
+    if (page?.type !== 'taming') return;
+    readPetScreen();
+}
+
+async function getApiPets() {
+    if (!hasAuth()) return null;
+    const now = Date.now();
+    if (userCache && now - userCacheTime < USER_TTL_MS) return userCache;
+    if (userInFlight) return userInFlight;
+    userInFlight = (async () => {
+        try {
+            const resp = await api.getUser();
+            if (!loggedUserShape) {
+                loggedUserShape = true;
+                const keys = resp && typeof resp === 'object' ? Object.keys(resp) : [];
+                const petsKey = keys.find(k => /pet/i.test(k) && Array.isArray(resp[k]));
+                console.log('[RiftScript] getUser top-level keys:', keys);
+                if (petsKey) {
+                    console.log(`[RiftScript] pets found under key "${petsKey}". First entry:`, resp[petsKey][0]);
+                } else {
+                    console.log('[RiftScript] no array key matching "pet" found. Inspect response manually:', resp);
+                }
+            }
+            const list = extractPetsFromUser(resp);
+            userCache = list;
+            userCacheTime = now;
+            return userCache;
+        } catch (e) {
+            console.warn('[RiftScript] getUser failed:', e.message);
+            return userCache;
+        } finally {
+            userInFlight = null;
+        }
+    })();
+    return userInFlight;
+}
+
+function extractPetsFromUser(resp) {
+    if (!resp || typeof resp !== 'object') return [];
+    const keys = Object.keys(resp);
+    const petsKey = keys.find(k => /pet/i.test(k) && Array.isArray(resp[k]));
+    if (!petsKey) return [];
+    const raw = resp[petsKey];
+    return raw.map(p => ({
+        id: p.id ?? p.petId ?? p.petID,
+        name: p.name ?? p.displayName,
+        species: p.species ?? p.speciesId ?? p.petSpecies,
+        level: p.level ?? 1,
+        health: p.health ?? p.statHealth ?? null,
+        attack: p.attack ?? p.statAttack ?? null,
+        defense: p.defense ?? p.statDefense ?? null,
+        passives: p.passives ?? p.petPassives ?? [],
+    })).filter(p => p.name);
+}
+
+async function readPetScreen() {
+    if (inProgress) return;
+    if (!data.pets) return;
+    inProgress = true;
+    try {
+        const pets = [];
+        $('taming-page button.row').each((_i, el) => {
+            const $el = $(el);
+            const $img = $el.find('.image img').first();
+            if (!$img.length) return;
+            const src = $img.attr('src') || '';
+            const filename = src.split('/').pop();
+            const species = data.pets.byImage[filename] || data.pets.byImage[src];
+            if (!species) return;
+
+            const $info = $el.find('.image').next();
+            const name = $info.find('.flex > :nth-child(1)').first().text().trim();
+            const levelText = $info.find('.flex > :nth-child(2)').first().text();
+            const level = parseNumber(levelText);
+
+            const $card = $el.closest('.card');
+            const partOfTeam = !!$card.find('.header:contains("Expedition Team")').length;
+            const partOfRanch = !!$card.find('.header:contains("Ranch")').length;
+            const location = partOfTeam ? 'team' : partOfRanch ? 'ranch' : 'collection';
+
+            pets.push({
+                species: species.id,
+                family: species.family,
+                name,
+                level,
+                location,
+                element: $el,
+            });
+        });
+
+        if (pets.length) {
+            // Compute groupIndex: position-within-(name|species|level) group
+            const groupCounters = {};
+            for (const p of pets) {
+                const k = `${p.name}|${p.species}|${p.level}`;
+                p.groupIndex = (groupCounters[k] || 0);
+                groupCounters[k] = p.groupIndex + 1;
+            }
+
+            // Try to attach unique IDs + stats from getUser API
+            const apiPets = await getApiPets();
+            if (apiPets?.length) {
+                // Match by name+species+level using order within group
+                const apiGroups = {};
+                for (const ap of apiPets) {
+                    const k = `${ap.name}|${ap.species}|${ap.level}`;
+                    if (!apiGroups[k]) apiGroups[k] = [];
+                    apiGroups[k].push(ap);
+                }
+                for (const p of pets) {
+                    const k = `${p.name}|${p.species}|${p.level}`;
+                    const bucket = apiGroups[k];
+                    if (bucket && bucket[p.groupIndex]) {
+                        const ap = bucket[p.groupIndex];
+                        p.apiId = ap.id;
+                        p.apiStats = ap;
+                    }
+                }
+            }
+
+            // Remember team membership so we can reconstruct it on sub-tabs
+            // where the team DOM isn't rendered (e.g., expedition sub-tab).
+            knownTeamNames = new Set(pets.filter(p => p.location === 'team').map(p => p.name));
+
+            lastPets = pets;
+            events.emit('reader-pet', pets);
+        } else {
+            // DOM has no pet rows on this sub-tab — reconstruct from API so
+            // expedition calc still has team data. Uses the team-name set
+            // remembered from the last Pets-sub-tab visit.
+            const apiPets = await getApiPets();
+            if (apiPets?.length) {
+                const reconstructed = apiPets.map(ap => {
+                    const species = data.pets?.byId?.[ap.species];
+                    return {
+                        species: ap.species,
+                        family: species?.family,
+                        name: ap.name,
+                        level: ap.level,
+                        location: knownTeamNames.has(ap.name) ? 'team' : 'collection',
+                        groupIndex: 0,
+                        element: $(),
+                        apiId: ap.id,
+                        apiStats: ap,
+                    };
+                });
+                lastPets = reconstructed;
+                events.emit('reader-pet', reconstructed);
+            }
+        }
+    } catch (e) {
+        console.warn('[RiftScript] pet reader error:', e);
+    } finally {
+        inProgress = false;
+    }
+}
+
+// Look for an open pet detail modal and scrape its stats into the cache.
+function maybeReadModal() {
+    const $modal = $('modal-component, .modal').last();
+    if (!$modal.length) return;
+    // Only act on taming page
+    const page = events.last('page');
+    if (page?.type !== 'taming') return;
+    // Pet modal has an "Abilities" section
+    if (!$modal.find('.name:contains("Abilities"), .header:contains("Abilities")').length) return;
+
+    const $header = $modal.find('.header').first();
+    const $img = $header.find('img').first();
+    const src = $img.attr('src') || '';
+    const filename = src.split('/').pop();
+    const species = data.pets?.byImage?.[filename] || data.pets?.byImage?.[src];
+
+    const name = $header.find('.description > button, .description > .name, .name').first().text().trim();
+    if (!name) return;
+    // Dedup by modal DOM element so re-scrapes only happen on a fresh modal
+    // (not on every MutationObserver tick of the same open modal). Same-name
+    // pets get different modal elements, so each gets scraped.
+    if ($modal[0] === lastReadModalEl) return;
+
+    const levelText = $header.find('.description > div, .level').first().text();
+    const level = parseNumber(levelText);
+
+    const stats = parseModalStats($modal);
+    const passives = parseModalPassives($modal);
+    const abilities = species ? extractAbilities(species) : [];
+
+    // Resolve which specific pet was clicked: prefer matching by the last
+    // clicked DOM row, fall back to first matching name+species+level.
+    let groupIndex = 0;
+    if (lastClickedRow) {
+        const match = lastPets.find(p => p.element[0] === lastClickedRow);
+        if (match && match.name === name) groupIndex = match.groupIndex || 0;
+    }
+    const petKey = { name, species: species?.id, level, groupIndex };
+    setPetStats(petKey, {
+        species: species?.id,
+        family: species?.family,
+        level,
+        ...stats,
+        passives,
+        abilities,
+    });
+    lastReadModalEl = $modal[0];
+    events.emit('reader-pet-modal', { name, level, ...stats, passives, abilities });
+    // Re-trigger list update so chips reflect the newly cached pet
+    setTimeout(trigger, 100);
+}
+
+function parseModalStats($modal) {
+    // Modal rows look like: "Health  141 (98%)" — grab the % in parens.
+    const labels = ['Health', 'Attack', 'Defense', 'Total'];
+    const out = {};
+    for (const label of labels) {
+        const $row = $modal.find(`.row:contains("${label}"), .stat:contains("${label}")`).first();
+        if (!$row.length) continue;
+        const text = $row.text();
+        const m = text.match(/\((\d+(?:\.\d+)?)\s*%\)/) || text.match(/(\d+(?:\.\d+)?)\s*%/);
+        if (m) out[label.toLowerCase()] = parseFloat(m[1]);
+    }
+    return out;
+}
+
+function parseModalPassives($modal) {
+    // Passive rows look like: "Melee Block 2  +4%". The label has the level
+    // baked into the name; the value has the effect %.
+    const passives = [];
+    const seen = new Set();
+    const rawSamples = [];
+    $modal.find('.row').each((_i, el) => {
+        const $row = $(el);
+        const text = $row.text().replace(/\s+/g, ' ').trim();
+        // Skip non-passive rows. Abilities / Species lack `\b` separation
+        // because jQuery .text() concatenates "Abilities" + "Wood 6" without
+        // a space — use a plain prefix match instead of \b.
+        if (/^(Health|Attack|Defense|Total|Abilities|Species)/i.test(text)) return;
+        rawSamples.push(text);
+        // Require the trailing "+X%" effect — that's what distinguishes a
+        // passive row from anything else in the modal.
+        const m = text.match(/^([A-Za-z][A-Za-z ]+?)\s+(\d+)\s*\+?\s*(\d+(?:\.\d+)?)\s*%$/);
+        if (!m) return;
+        const name = m[1].trim();
+        const level = parseInt(m[2]);
+        const effect = m[3] ? parseFloat(m[3]) : null;
+        const key = `${name}|${level}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        passives.push({ name, level, effect });
+    });
+    if (passives.length === 0 && rawSamples.length) {
+        console.log('[RiftScript] no passives matched. Raw row samples:', rawSamples);
+    } else {
+        console.log('[RiftScript] passives parsed:', passives);
+    }
+    return passives;
+}
+
+function extractAbilities(species) {
+    if (!species?.abilities) return [];
+    if (Array.isArray(species.abilities)) {
+        return species.abilities.map(a => {
+            if (typeof a === 'string') return { name: a };
+            const key = Object.keys(a)[0];
+            return { name: key, value: a[key] };
+        });
+    }
+    return [];
+}

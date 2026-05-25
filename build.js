@@ -16,17 +16,18 @@ const HEADER = `// ==UserScript==
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ironwoodrpg.com
 // @grant        GM_xmlhttpRequest
 // @connect      api-2.ironwoodrpg.com
-// @connect      iwrpg.vectordungeon.com
 // @connect      rift-script.web.app
+// @connect      rift-script--dev-y8m8gvy1.web.app
+// @connect      firestore.googleapis.com
 // @noframes
 // @require      https://code.jquery.com/jquery-3.6.4.min.js
 // ==/UserScript==
 //
 // @connect explained:
-// - api-2.ironwoodrpg.com : Fetches your player data (stats, equipment, inventory) for the Combat Calculator.
+// - api-2.ironwoodrpg.com : Fetches your player data (stats, equipment, inventory, market listings) for combat/market features.
 //   Uses your existing game session token from IndexedDB — never stored or sent anywhere else.
-// - iwrpg.vectordungeon.com : Public game data API (items, skills, monsters, drops). No auth needed.
-// - rift-script.web.app : Checks for script updates and hosts the Discord OAuth callback.
+// - rift-script.web.app : Hosts the script, public game data (items, skills, monsters, drops), Discord OAuth callback, update checks.
+// - firestore.googleapis.com : Public read of Rift guild member list for market highlighting.
 //
 // Discord OAuth: Used to link your Discord account. We only request your username, avatar, and user ID.
 // Your user ID is used to send DM notifications from the Rifty bot. No other Discord data is accessed.

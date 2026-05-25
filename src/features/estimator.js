@@ -7,6 +7,7 @@ export function initEstimator() {
     events.on('page', update);
     events.on('action-exp', update);
     events.on('action-inventory', update);
+    events.on('action-loot', update);
     events.on('action-active', update);
     events.on('game-estimates', update);
     events.on('action-set-amount', update);
@@ -108,6 +109,8 @@ function calculate(skillId, actionId) {
     const levelUpSeconds = xpPerHour > 0 ? (levelUpExp / xpPerHour) * 3600 : Infinity;
     const tierUpSeconds = tierUpExp > 0 && xpPerHour > 0 ? (tierUpExp / xpPerHour) * 3600 : 0;
 
+    const loot = events.last('action-loot') || {};
+
     return {
         skillId,
         actionId,
@@ -125,6 +128,7 @@ function calculate(skillId, actionId) {
         finishedSeconds,
         ingredients: ingredientDetails,
         drops: dropDetails,
+        loot,
         dropGoldPerHour,
         ingredientGoldPerHour,
         profitPerHour,

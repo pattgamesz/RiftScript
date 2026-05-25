@@ -8,10 +8,32 @@ import { data } from '../game/data.js';
 
 const PANEL_ID = 'riftscript-estimator';
 let goalLevel = 100;
+let lootGoal = 0;
 let activeTab = 'action';
 
 // Custom item prices — persisted to localStorage
 let customPrices = {};
+
+// Loot goals — persisted per actionId
+let lootGoals = {};
+
+function loadLootGoals() {
+    lootGoals = storage.getData('loot-goals') || {};
+}
+
+function saveLootGoal(actionId, target) {
+    if (target > 0) {
+        lootGoals[actionId] = target;
+    } else {
+        delete lootGoals[actionId];
+    }
+    storage.save('loot-goals', lootGoals);
+}
+
+function getMainDrop(est) {
+    if (!est.drops || !est.drops.length) return null;
+    return est.drops.reduce((best, d) => d.perHour > best.perHour ? d : best, est.drops[0]);
+}
 
 function loadCustomPrices() {
     customPrices = storage.getData('custom-prices') || {};
@@ -30,6 +52,7 @@ function getPrice(itemId) {
 
 export function initEstimatorPanel() {
     loadCustomPrices();
+    loadLootGoals();
     events.on('estimation', onEstimation);
     events.on('page', (page) => {
         if (page.type !== 'action') $(`#${PANEL_ID}`).remove();
@@ -80,6 +103,12 @@ function createPanel(est) {
                     <span class="rs-mid"><input type="number" class="rs-goal-input" value="${goalLevel}" min="1" max="200" /></span>
                     <span class="rs-value"><span class="rs-goal-result" data-field="goalTime"></span></span>
                 </div>
+                <div class="rs-row" data-field="lootGoalRow">
+                    <span class="rs-icon">📦</span>
+                    <span class="rs-label">Loot goal</span>
+                    <span class="rs-mid"><span class="rs-loot-item-name" data-field="lootGoalLabel"></span><input type="number" class="rs-loot-goal-input" value="${lootGoal}" min="0" placeholder="0" /></span>
+                    <span class="rs-value"><span data-field="lootGoalTime"></span><span class="rs-extra" data-field="lootGoalExtra"></span></span>
+                </div>
             </div>
             <div class="rs-tab-content ${activeTab !== 'items' ? 'rs-hidden' : ''}" data-tab="items">
                 <div data-field="itemsContent"></div>
@@ -105,9 +134,19 @@ function createPanel(est) {
             updateValues(events.last('estimation'));
         })
         .on('keydown', function(e) {
-            if (e.key === 'Enter') {
-                $(this).blur();
-            }
+            if (e.key === 'Enter') $(this).blur();
+        });
+
+    // Loot goal input
+    panel.find('.rs-loot-goal-input')
+        .on('change', function() {
+            const est = events.last('estimation');
+            lootGoal = +$(this).val() || 0;
+            if (est) saveLootGoal(est.actionId, lootGoal);
+            updateValues(est);
+        })
+        .on('keydown', function(e) {
+            if (e.key === 'Enter') $(this).blur();
         });
 
     // Timer button
@@ -146,6 +185,13 @@ function updateValues(est) {
     const p = $(`#${PANEL_ID}`);
     if (!p.length) return;
 
+    // Load saved loot goal for this action (without re-rendering input if focused)
+    const savedGoal = lootGoals[est.actionId] || 0;
+    if (!p.find('.rs-loot-goal-input').is(':focus') && lootGoal !== savedGoal) {
+        lootGoal = savedGoal;
+        p.find('.rs-loot-goal-input').val(lootGoal || '');
+    }
+
     // Overview
     p.find('[data-field="xpPerHour"]').text(formatNumber(est.xpPerHour));
     p.find('[data-field="finished"]').text(est.isActive ? secondsToDuration(est.finishedSeconds) : 'Not active');
@@ -176,6 +222,31 @@ function updateValues(est) {
                 ? `${secondsToDuration(goal.seconds)}<span class="rs-extra">${formatNumber(goal.actions)} actions</span>`
                 : 'Now'
         );
+    }
+
+    // Loot goal
+    const mainDrop = getMainDrop(est);
+    if (mainDrop && mainDrop.perHour > 0) {
+        p.find('[data-field="lootGoalRow"]').show();
+        const itemName = getItemName(mainDrop.itemId);
+        const currentCount = est.loot?.[mainDrop.itemId] || 0;
+        p.find('[data-field="lootGoalLabel"]').text(itemName);
+
+        if (lootGoal > 0) {
+            const remaining = Math.max(0, lootGoal - currentCount);
+            if (remaining === 0) {
+                p.find('[data-field="lootGoalTime"]').html('Done!');
+            } else {
+                const secs = (remaining / mainDrop.perHour) * 3600;
+                p.find('[data-field="lootGoalTime"]').html(secondsToDuration(secs));
+                p.find('[data-field="lootGoalExtra"]').html(`${formatNumber(currentCount)} / ${formatNumber(lootGoal)}`);
+            }
+        } else {
+            p.find('[data-field="lootGoalTime"]').html('');
+            p.find('[data-field="lootGoalExtra"]').html(`${formatNumber(currentCount)} looted`);
+        }
+    } else {
+        p.find('[data-field="lootGoalRow"]').hide();
     }
 
     // Items tab — only rebuild if not focused on a price input

@@ -11,6 +11,31 @@ const PAGE_TAG = 'riftscript-page';
 let isOpen = false;
 let activeMenu = 'info';
 
+// ─── Global settings (not mode-scoped) ──────────────────────
+const GLOBAL_PREFIX = 'riftscript_global_';
+
+function globalGet(name) {
+    try {
+        const raw = localStorage.getItem(GLOBAL_PREFIX + name);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+}
+
+function globalSet(name, value) {
+    try {
+        localStorage.setItem(GLOBAL_PREFIX + name, JSON.stringify(value));
+    } catch (e) { /* quota */ }
+}
+
+function migrateUISettings() {
+    // Migrate old mode-scoped UI settings to global keys
+    for (const key of ['ui-changes', 'recipe-clickthrough']) {
+        if (globalGet(key) != null) continue;
+        const old = storage.getData(key);
+        if (old != null) globalSet(key, old);
+    }
+}
+
 // ─── UI Changes ──────────────────────────────────────────────
 
 const UI_CHANGES_ID = 'riftscript-ui-changes';
@@ -20,12 +45,12 @@ const UI_SECTIONS = [
     'guild-page', 'home-page', 'leaderboards-page', 'market-page', 'merchant-page',
     'quests-page', 'settings-page', 'skill-page', 'upgrade-page', 'taming-page',
     'traits-page', 'mastery-page', 'marks-page', 'profile-page', 'store-page',
-    'adventure-page',
+    'adventure-page', 'attunement-page',
 ].join(', ');
 const UI_SELECTOR = `:is(${UI_SECTIONS})`;
 
 function applyUIChanges() {
-    const enabled = storage.getData('ui-changes');
+    const enabled = globalGet('ui-changes');
     const existing = document.getElementById(UI_CHANGES_ID);
     if (enabled && !existing) {
         document.documentElement.style.setProperty('--gap', '10px');
@@ -127,8 +152,16 @@ function applyRecipeClickthrough() {
 const GAME_PAGES = 'skill-page, equipment-page, home-page, market-page, merchant-page, settings-page, taming-page, profile-page, quests-page, guild-page, adventure-page, challenges-page, leaderboards-page, upgrade-page, traits-page, mastery-page, marks-page, store-page, daily-quest-page, changelog-page';
 
 export function initMenu() {
+    migrateUISettings();
     applyUIChanges();
     setInterval(injectNavButton, 1000);
+
+    // Re-apply UI changes once game mode is detected (settings may have been
+    // saved under a mode-scoped key before this fix)
+    events.on('mode', () => {
+        migrateUISettings();
+        applyUIChanges();
+    });
 
     events.on('page', (page) => {
         // Navigated away — clean up our page (same as Pancake's handlePage)
@@ -147,7 +180,7 @@ export function initMenu() {
             }
             isOpen = false;
         }
-        if (page.type === 'action' && storage.getData('recipe-clickthrough')) {
+        if (page.type === 'action' && globalGet('recipe-clickthrough')) {
             setTimeout(applyRecipeClickthrough, 200);
         }
     });
@@ -276,7 +309,110 @@ function renderPage() {
                         <div class="rs-card">
                             <div class="rs-card-header">Changelog</div>
                             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.1.1</div>
+                                <div class="rs-changelog-section">v1.4.0</div>
+                                <ul>
+                                    <li><b>Pet Manager</b> on the Taming page — inline H/A/D + passive chips on every pet (click once to cache), best-in-family ★ marker, exact duplicate detection, "Only perfect stats" filter, family + sort options</li>
+                                    <li><b>Expedition Calculator</b> tab in the Pet Manager — per-tier success chance, drops, food cost, egg chance, EXP per run; weekly rotation auto-detected; plan ahead for next week / in 2 weeks</li>
+                                    <li><b>Guild Quests tab</b> on the market filter — open quests with live reset countdown, click a quest to instantly search the market for it</li>
+                                    <li>Drag-and-drop reorder for saved market filters</li>
+                                    <li>Rift member ★ moved to a cleaner spot; vendor/ratio chips now sit next to the price</li>
+                                    <li>Market filter auto-resets each time you enter the market page</li>
+                                    <li>Target button on Buy/Order modals now matches the game's native button styling</li>
+                                    <li>Compact UI now also applies to the Attunement page</li>
+                                    <li>Idle Beep is off by default and no longer false-triggers on page navigation</li>
+                                    <li>Faster startup: game data cached locally with background refresh (no third-party data API)</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.3.5</div>
+                                <ul>
+                                    <li>Pet stats now sourced from the getUser API — each pet's data lookup is unique (no more sharing stats between same-name pets)</li>
+                                    <li>Sort uses CSS order instead of moving DOM nodes — stable position-based fallback for breeders</li>
+                                    <li>Hunger passive always shown red regardless of tier</li>
+                                    <li>Cached counter updates instantly when you click a new pet</li>
+                                    <li>Fix: jQuery handler crash that broke the entire pet panel</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.3.4</div>
+                                <ul>
+                                    <li>Removed runtime dependency on third-party data API — public game data is now exclusively served from our own hosting</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.3.3</div>
+                                <ul>
+                                    <li>Public game data now served from our own hosting first — fixes pet panel and other features for Firefox users who couldn't reach the live API's cert chain</li>
+                                    <li>Pet panel shows a clear error message if data still fails to load</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.3.2</div>
+                                <ul>
+                                    <li>Pet panel moves to the right sidebar on desktop (above on mobile)</li>
+                                    <li>Pet stat chips now match the game's tag style exactly and sit on a second row under the in-game tags</li>
+                                    <li>Passives are shown as initials+level chips with full name on hover — level 4 turns green</li>
+                                    <li>Perfect 300% total roll highlights the game's own % tag green (no duplicate chip)</li>
+                                    <li>Legend explaining all colors and the modal-cache flow</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.3.1</div>
+                                <ul>
+                                    <li>Pet manager — inline H/A/D stat chips on every pet, no rename gymnastics</li>
+                                    <li>Stats are scraped from the pet detail modal and cached in localStorage — click any pet once to populate</li>
+                                    <li>Gold ★ on the best pet per family (highest total stats) and green chips on best per-stat in family</li>
+                                    <li>Sort the pet list by level, health, attack, defense, total stats, or family</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.3.0</div>
+                                <ul>
+                                    <li>Market: Competition indicator (dots on your own listings if others match/undercut)</li>
+                                    <li>Market: Price buttons (Min / Low / High quick-fill when listing)</li>
+                                    <li>Market: Listing limit warning when more than 250 listings exist for an item</li>
+                                    <li>Market: Target amount button on Buy/Order modals — fills only what you still need</li>
+                                    <li>Pets: family filter and duplicate-pet highlighting on the Taming page</li>
+                                    <li>Idle Beep: short tone when your active action stops</li>
+                                    <li>Settings page now grouped (General / Market / Pets) with per-feature toggles</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.2.2</div>
+                                <ul>
+                                    <li>Value ratio switched to listing price ÷ vendor sell price — thresholds: green ≤ 3×, orange 3–5×, red &gt; 5×</li>
+                                    <li>"Show best (amount)" only applies when you click outside the field, so you can type multi-digit numbers</li>
+                                    <li>Saved filters correctly restore the Show best amount when reapplied</li>
+                                    <li>Fixed browser crash when switching between tribute filters (huge regex no longer injected, batched DOM reorder)</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.2.1</div>
+                                <ul>
+                                    <li>All filters now use the same value metric: listing price ÷ minimum market price (more accurate than the old conversion-yield ratio)</li>
+                                    <li>Saved filters include the "Show best" amount, including for tributes</li>
+                                    <li>Market filter panel sits above the listings on mobile (≤ 750px) so it's reachable without scrolling</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.2.0</div>
+                                <ul>
+                                    <li>Tribute filters — Forest, Mountain, and Ocean tribute presets in the Filter dropdown</li>
+                                    <li>Vendor sell price chip on every tribute listing for quick reference</li>
+                                    <li>Color-coded ratio chip (listing ÷ min market price) — green ≤2×, orange 2–3×, red ≥3×</li>
+                                    <li>Tribute listings auto-sort with the best deals on top</li>
+                                    <li>Mountain tribute excludes upgraded gear (Superior / Exquisite / Perfect) and runes</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.1.6</div>
+                                <ul>
+                                    <li>Rift Members highlight on the market now actually works — switched seller lookup to the Ironwood API for reliable matching</li>
+                                    <li>Market filter loads instantly on page open (no more click-a-tab-to-trigger)</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.1.5</div>
+                                <ul>
+                                    <li>Market Filter — preset Type categories (Food, Charcoal, Compost, …) with best-deal sort and ratio chip, plus saved filters</li>
+                                    <li>Rift Members toggle on market listings — highlight or show only listings sold by Rift / RiftAcademy / RiftChill members</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.1.4</div>
+                                <ul>
+                                    <li>Loot Goal — set a target amount for any gathered item and see a live time estimate</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.1.3</div>
+                                <ul>
+                                    <li>Fixed UI Changes and Recipe Clickthrough not staying enabled after reload</li>
+                                    <li>Fixed game data failing to load when the API is temporarily unreachable</li>
+                                    <li>Game data is now cached locally — features keep working even if the API goes down</li>
+                                    <li>Added automatic retry for failed API requests</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.1.2</div>
+                                <ul>
+                                    <li>Combat Simulator page — simulate fights with full modifier support, equipment selector, and content settings</li>
+                                    <li>Set Amount timer on skill pages</li>
+                                    <li>Navigation and page routing fixes</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.1.1</div>
                                 <ul>
                                     <li>Fixed minor bugs</li>
                                 </ul>
@@ -373,13 +509,18 @@ function renderPage() {
     });
 
     page.find('#rs-ui-changes').on('change', function() {
-        storage.save('ui-changes', $(this).is(':checked'));
+        globalSet('ui-changes', $(this).is(':checked'));
         applyUIChanges();
     });
 
     page.find('#rs-recipe-clickthrough').on('change', function() {
-        storage.save('recipe-clickthrough', $(this).is(':checked'));
+        globalSet('recipe-clickthrough', $(this).is(':checked'));
         applyRecipeClickthrough();
+    });
+
+    page.find('.rs-feature-toggle').on('change', function() {
+        const key = $(this).data('key');
+        globalSet(key, $(this).is(':checked'));
     });
 
     page.find('#rs-discord-link').on('click', () => openOAuth());
@@ -417,11 +558,27 @@ function renderPage() {
 // ─── Settings Card ───────────────────────────────────────────
 
 function renderSettingsCard() {
-    const uiChanges = storage.getData('ui-changes');
-    const recipeClickthrough = storage.getData('recipe-clickthrough');
+    const uiChanges = globalGet('ui-changes');
+    const recipeClickthrough = globalGet('recipe-clickthrough');
+    const setting = (key, label, desc, defaultOn = false) => {
+        const stored = globalGet(key);
+        const checked = stored === null ? defaultOn : !!stored;
+        return `
+            <div class="rs-row rs-setting-row">
+                <div class="rs-setting-info">
+                    <span>${label}</span>
+                    <span class="rs-setting-desc">${desc}</span>
+                </div>
+                <label class="rs-toggle">
+                    <input type="checkbox" class="rs-feature-toggle" data-key="${key}" ${checked ? 'checked' : ''}>
+                    <span class="rs-toggle-slider"></span>
+                </label>
+            </div>
+        `;
+    };
     return `
         <div class="rs-card">
-            <div class="rs-card-header">Settings</div>
+            <div class="rs-card-header">General</div>
             <div class="rs-row rs-setting-row">
                 <div class="rs-setting-info">
                     <span>UI Changes</span>
@@ -441,6 +598,32 @@ function renderSettingsCard() {
                     <input type="checkbox" id="rs-recipe-clickthrough" ${recipeClickthrough ? 'checked' : ''}>
                     <span class="rs-toggle-slider"></span>
                 </label>
+            </div>
+            <div class="rs-row rs-setting-row">
+                <div class="rs-setting-info">
+                    <span>Idle Beep</span>
+                    <span class="rs-setting-desc">Plays a short beep when your current action stops (you become idle). Off by default.</span>
+                </div>
+                <label class="rs-toggle">
+                    <input type="checkbox" class="rs-feature-toggle" data-key="idle-beep" ${globalGet('idle-beep') ? 'checked' : ''}>
+                    <span class="rs-toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        <div class="rs-card">
+            <div class="rs-card-header">Market</div>
+            ${setting('market-competition', 'Competition indicator', 'Colored dot on your own listings if others match (orange) or undercut (red) your price.', true)}
+            ${setting('market-listing-limit', 'Listing limit warning', 'Banner when more than 250 listings exist for the current item — game UI caps at 250.', true)}
+            ${setting('market-price-buttons', 'Price buttons', 'Adds Min / Low / High quick-fill buttons next to the Price input when listing.', true)}
+            ${setting('market-target-amount', 'Target amount', 'Adds a Target button on Buy/Order modals — fills only what you need to reach a desired total.', true)}
+        </div>
+        <div class="rs-card">
+            <div class="rs-card-header">Pets</div>
+            <div class="rs-row">
+                <span style="font-size:0.78em;color:rgba(255,255,255,0.5);line-height:1.4">
+                    Toggles for the pet panel live on the Taming → Pets page itself: family filter and duplicate highlighting.
+                    Pet stat tools (renamer / highlighter / redesign) need Pancake's encoded-name system — coming later.
+                </span>
             </div>
         </div>
     `;

@@ -1,7 +1,7 @@
 // Cross-origin request wrapper using Tampermonkey's GM_xmlhttpRequest
 // Falls back to regular fetch if GM_xmlhttpRequest is not available
 
-export function gmFetch(url, options = {}) {
+function gmFetchOnce(url, options = {}) {
     if (typeof GM_xmlhttpRequest === 'undefined') {
         return fetch(url, options).then(res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
@@ -31,6 +31,23 @@ export function gmFetch(url, options = {}) {
             },
         });
     });
+}
+
+export async function gmFetch(url, options = {}) {
+    const maxRetries = options.retries ?? 3;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await gmFetchOnce(url, options);
+        } catch (e) {
+            if (attempt < maxRetries) {
+                const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+                console.warn(`[RiftScript] Retry ${attempt + 1}/${maxRetries} in ${delay}ms: ${url}`);
+                await new Promise(r => setTimeout(r, delay));
+            } else {
+                throw e;
+            }
+        }
+    }
 }
 
 export function gmFetchText(url) {

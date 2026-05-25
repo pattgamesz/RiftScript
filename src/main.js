@@ -6,6 +6,15 @@ import { initReaders } from './game/reader.js';
 import { initModeDetector } from './game/mode.js';
 import { initEstimator } from './features/estimator.js';
 import { initVersionCheck } from './features/versionCheck.js';
+import { initMarketReader } from './game/marketReader.js';
+import { initMarketFilter } from './features/marketFilter.js';
+import { initMarketCompetition } from './features/marketCompetition.js';
+import { initMarketPriceButtons } from './features/marketPriceButtons.js';
+import { initMarketListingLimit } from './features/marketListingLimit.js';
+import { initTargetAmountMarket } from './features/targetAmountMarket.js';
+import { initIdleBeep } from './features/idleBeep.js';
+import { initPetReader } from './game/petReader.js';
+import { initPetFilter } from './features/petFilter.js';
 import { initEstimatorPanel } from './ui/estimatorPanel.js';
 import { initMenu } from './ui/menu.js';
 import { initCombatSimPage } from './ui/combatSimPage.js';
@@ -19,6 +28,7 @@ import { initStyles } from './ui/styles.js';
     initStyles();
     initPageDetector();
     initModeDetector();
+    initMenu();
 
     await Promise.all([
         initAuthInterceptor(),
@@ -26,11 +36,19 @@ import { initStyles } from './ui/styles.js';
     ]);
 
     initReaders();
+    initMarketReader();
+    initPetReader();
     initEstimator();
     initVersionCheck();
     initEstimatorPanel();
-    initMenu();
     initCombatSimPage();
+    initMarketFilter();
+    initMarketCompetition();
+    initMarketPriceButtons();
+    initMarketListingLimit();
+    initTargetAmountMarket();
+    initIdleBeep();
+    initPetFilter();
 
     console.log('[RiftScript] Ready.');
 })();

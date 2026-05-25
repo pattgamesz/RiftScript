@@ -15,11 +15,16 @@ function readAll() {
     readSidebarLevels();
 
     if (page.type === 'action') {
+        // Skip the whole block if the skill-page is being torn down — prevents
+        // a stale page snapshot from emitting a false "inactive" during nav.
+        const $skill = $('skill-page');
+        if (!$skill.length) return;
         readActionExp(page.skill);
         readActionInventory();
+        readActionLoot();
         readActionEstimates(page.skill);
         readSetAmount(page.skill);
-        const isActive = $('skill-page .action-stop').length > 0;
+        const isActive = $skill.find('.action-stop').length > 0;
         events.emit('action-active', isActive);
     }
 }
@@ -69,6 +74,18 @@ function readActionInventory() {
             extractItem($el, inventory);
         });
     events.emit('action-inventory', inventory);
+}
+
+// Read loot items and their counts from the Loot section
+function readActionLoot() {
+    const loot = {};
+    $('skill-page .header > .name:contains("Loot")')
+        .closest('.card')
+        .find('.row')
+        .each((_i, el) => {
+            extractItem($(el), loot);
+        });
+    events.emit('action-loot', loot);
 }
 
 // Read the set amount from the Loot header (e.g. "1,177 / 2,734")
