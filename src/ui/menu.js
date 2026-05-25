@@ -328,7 +328,18 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.4.1 – v1.4.4 — Combat Simulator overhaul</div>
+                                <div class="rs-changelog-section">v1.5.0 — Combat Simulator: complete Rivea sheet port</div>
+                                <ul>
+                                    <li><b>Combat Sim now mirrors the entire Rivea spreadsheet</b> — every named range that affects XP/loot/profit is wired up. Mark variants (Primary/Defense/FullSet/RegionSet), Trait set bonuses, Runic Tome chain, Eff Skill Rune, Adventure Profit per-item rates, and 14 relic-effect toggles.</li>
+                                    <li><b>Three earlier-broken masteries now actually work</b>: Coin Drop (loot value), Double XP (XP/hr), Lantern (key cost reduction).</li>
+                                    <li><b>Insatiable in the simulator</b>: real per-hit proc rolls (T8 + Wisdom + Relic ≈ 24% extra-hit chance), not just a flat XP boost.</li>
+                                    <li><b>Pet Manager / Expedition calc now survives sub-tab navigation</b>: the panel re-injects itself on every taming sub-tab (Pets / Ranch / Breeding / Expedition) and re-emits the last good pet scrape so the expedition calc keeps its data.</li>
+                                    <li>Seed input for reproducible simulations.</li>
+                                    <li>Equipment-derived fields no longer overwrite manual edits.</li>
+                                    <li>Outskirts kills/hr fix (efficiency no longer double-applied).</li>
+                                    <li>Many smaller bug fixes from v1.4.1 – v1.4.6.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.4.1 – v1.4.4 — Combat Simulator overhaul</div>
                                 <ul>
                                     <li><b>Bug fixes</b>: XP/hr and Loot/hr now include every modifier shown in the breakdown panels (potion, brew, relic, trait, mark, guild, masteries) — previously only the equipment chip values were applied.</li>
                                     <li><b>Outskirts fix</b>: kills/hr no longer double-applies efficiency when grinding Outskirts content.</li>

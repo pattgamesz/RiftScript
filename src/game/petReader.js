@@ -165,10 +165,16 @@ async function readPetScreen() {
 
             lastPets = pets;
             events.emit('reader-pet', pets);
+        } else if (lastPets.length) {
+            // DOM has no pet rows (e.g., on the in-game Expedition / Ranch /
+            // Breeding sub-tab where the .row buttons aren't rendered). Re-emit
+            // the last good scrape so the expedition calc keeps showing data.
+            // The stale .element jQuery refs become no-ops on visual decoration,
+            // which is fine — the expedition tab doesn't need DOM access.
+            events.emit('reader-pet', lastPets);
         } else {
-            // DOM has no pet rows on this sub-tab — reconstruct from API so
-            // expedition calc still has team data. Uses the team-name set
-            // remembered from the last Pets-sub-tab visit.
+            // No prior scrape — first load on a sub-tab without pet rows.
+            // Reconstruct from API so the expedition calc has team data.
             const apiPets = await getApiPets();
             if (apiPets?.length) {
                 const reconstructed = apiPets.map(ap => {

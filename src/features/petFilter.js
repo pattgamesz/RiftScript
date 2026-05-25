@@ -43,6 +43,16 @@ export function initPetFilter() {
         triggerPetReader();
     });
     window.addEventListener('resize', handleResize);
+    // Sub-tab clicks inside taming-page (Pets / Ranch / Breeding / Expedition)
+    // re-render Angular's groups container without firing a 'page' event, so
+    // our injected panel disappears. Poll-and-reinject keeps it alive on every
+    // taming sub-tab including the in-game Expedition view.
+    setInterval(() => {
+        if ($('taming-page').length && !$(`#${PANEL_ID}`).length) {
+            ensurePanel();
+            triggerPetReader();
+        }
+    }, 1000);
 }
 
 function onPage(page) {
