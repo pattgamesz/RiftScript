@@ -1,5 +1,12 @@
-// Inject RiftScript CSS into the page
+// Inject RiftScript CSS + Font Awesome (for the pet/passive chip icons).
 export function initStyles() {
+    if (!document.getElementById('rs-fa-css')) {
+        const link = document.createElement('link');
+        link.id = 'rs-fa-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://use.fontawesome.com/releases/v6.5.1/css/all.css';
+        document.head.appendChild(link);
+    }
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
@@ -860,7 +867,9 @@ riftscript-page .rs-row:last-child {
    border-radius:4px, padding:2px 6px, border:1px solid #263849,
    font-size:14px, color:#aaa. */
 .rs-pet-chip {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     border-radius: 4px;
     padding: 2px 6px;
     border: 1px solid #263849;
@@ -871,6 +880,10 @@ riftscript-page .rs-row:last-child {
     margin-top: 2px;
     line-height: 1.4;
     white-space: nowrap;
+}
+.rs-pet-chip > i {
+    font-size: 0.85em;
+    opacity: 0.85;
 }
 .rs-pet-chip-best,
 .rs-pet-chip-best-perfect {

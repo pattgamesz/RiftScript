@@ -547,20 +547,52 @@ function detectTagClass($tags) {
     return detectedTagClass || '';
 }
 
+// Font Awesome (FA6 free) icons per stat / passive prefix. Pet panel chips
+// use these instead of letter abbreviations so the tags read at a glance.
+// Matching is by the passive's first word (lower-case): "Loot Find" → loot.
+const STAT_ICONS = {
+    H: { icon: 'fa-heart',           label: 'Health' },
+    A: { icon: 'fa-burst',           label: 'Attack' },
+    D: { icon: 'fa-shield-halved',   label: 'Defense' },
+};
+const PASSIVE_ICONS = {
+    melee:   'fa-hand-fist',
+    ranged:  'fa-crosshairs',
+    magic:   'fa-wand-magic-sparkles',
+    loot:    'fa-sack-dollar',
+    egg:     'fa-egg',
+    hunger:  'fa-bowl-food',
+    health:  'fa-heart',
+    attack:  'fa-burst',
+    defense: 'fa-shield-halved',
+};
+function passiveIcon(name) {
+    const firstWord = (name || '').toLowerCase().split(/\s+/)[0];
+    return PASSIVE_ICONS[firstWord] || null;
+}
+
 function statChip(letter, value, isBest, gameTagClass) {
     if (value == null) return '';
     const cls = `${gameTagClass} rs-pet-chip${isBest ? ' rs-pet-chip-best' : ''}`.trim();
-    return `<div class="${cls}">${letter}${Math.round(value)}</div>`;
+    const meta = STAT_ICONS[letter];
+    const v = Math.round(value);
+    if (!meta) return `<div class="${cls}">${letter}${v}</div>`;
+    return `<div class="${cls}" title="${meta.label}: ${v}%"><i class="fa-solid ${meta.icon}"></i><span>${v}</span></div>`;
 }
 
 function passiveChip(passive, gameTagClass) {
     const name = passive.name || '';
-    const abbr = name.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('');
-    const label = `${abbr}${passive.level || ''}`;
     const tooltip = `${name} ${passive.level || ''}`.trim() + (passive.effect ? ` (+${passive.effect}%)` : '');
     const isNegative = /hunger/i.test(name);
     const isMaxTier = !isNegative && (passive.level || 0) >= 4;
     const extra = (isNegative ? ' rs-pet-chip-negative' : '') + (isMaxTier ? ' rs-pet-chip-tier-max' : '');
     const cls = `${gameTagClass} rs-pet-chip rs-pet-chip-passive${extra}`.trim();
-    return `<div class="${cls}" title="${escapeHtml(tooltip)}">${escapeHtml(label)}</div>`;
+    const icon = passiveIcon(name);
+    const level = passive.level || '';
+    // Icon present → show icon + level. Unknown passive → fall back to the
+    // legacy abbreviation so we never render an empty chip.
+    const inner = icon
+        ? `<i class="fa-solid ${icon}"></i><span>${level}</span>`
+        : (name.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('') + level);
+    return `<div class="${cls}" title="${escapeHtml(tooltip)}">${inner}</div>`;
 }
