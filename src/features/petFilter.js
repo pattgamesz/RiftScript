@@ -20,6 +20,7 @@ const PERFECT_KEY = 'pet-only-perfect';
 const TAB_KEY = 'pet-active-tab';
 const EXP_WEEK_KEY = 'pet-exp-week-offset';
 const EXP_TIER_KEY = 'pet-exp-selected-tier';
+const CHIPS_ENABLED_KEY = 'pet-chips-enabled';
 
 let activeTab = 'manager'; // 'manager' | 'expedition'
 
@@ -89,6 +90,10 @@ function bindDelegatedHandlers() {
     });
     $(document).on('change', `${sel} .rs-pet-perfect`, function() {
         gset(PERFECT_KEY, $(this).is(':checked'));
+        triggerPetReader();
+    });
+    $(document).on('change', `${sel} .rs-pet-chips-toggle`, function() {
+        gset(CHIPS_ENABLED_KEY, $(this).is(':checked'));
         triggerPetReader();
     });
 }
@@ -214,6 +219,13 @@ function renderManagerTab() {
                 <option value="defense" ${sort === 'defense' ? 'selected' : ''}>Defense % (best first)</option>
                 <option value="total" ${sort === 'total' ? 'selected' : ''}>Total stats (best first)</option>
             </select>
+        </div>
+        <div class="rs-pet-row">
+            <div class="rs-pet-label">RiftScript pet chips</div>
+            <label class="rs-toggle">
+                <input type="checkbox" class="rs-pet-chips-toggle" ${getOnDefault(CHIPS_ENABLED_KEY) ? 'checked' : ''}>
+                <span class="rs-toggle-slider"></span>
+            </label>
         </div>
         <div class="rs-pet-row">
             <div class="rs-pet-label">Highlight duplicates</div>
@@ -402,6 +414,11 @@ function applyToList(pets) {
     const dup = !!gget(DUP_KEY);
     const sort = gget(SORT_KEY, 'default');
     const onlyPerfect = !!gget(PERFECT_KEY);
+    const chipsEnabled = getOnDefault(CHIPS_ENABLED_KEY);
+
+    // Toggle game-tag hiding via a class on taming-page. The CSS rule lives in
+    // styles.js — when chips are off we show the game's native tags untouched.
+    $('taming-page').toggleClass('rs-pet-chips-on', chipsEnabled);
 
     // Attach stats — prefer getUser API (unique per pet ID), fall back to modal-scrape cache.
     for (const pet of pets) pet.cachedStats = pet.apiStats || getPetStats(pet);
@@ -411,7 +428,7 @@ function applyToList(pets) {
     const statBestPerFamily = computeStatBestPerFamily(pets);
 
     for (const pet of pets) {
-        decoratePet(pet, { family, dup, onlyPerfect, fingerprintCount, bestPerFamily, statBestPerFamily });
+        decoratePet(pet, { family, dup, onlyPerfect, chipsEnabled, fingerprintCount, bestPerFamily, statBestPerFamily });
     }
 
     // Sort via CSS `order` so DOM order stays stable — critical for breeders
@@ -443,7 +460,9 @@ function decoratePet(pet, ctx) {
     }
 
     const s = pet.cachedStats;
-    if (s && (s.health != null || s.attack != null || s.defense != null)) {
+    // Chips toggle: when off, skip all our chip injection so only the game's
+    // native tags show. Best-star / family-filter / duplicate-highlight still apply.
+    if (ctx.chipsEnabled && s && (s.health != null || s.attack != null || s.defense != null)) {
         injectStatAndPassiveChips(pet, s, ctx);
     }
 
@@ -503,6 +522,17 @@ function injectStatAndPassiveChips(pet, s, ctx) {
             if (ctx.onlyPerfect && !isPerfectPassive) continue;
             if (isPerfectPassive) hasKeeper = true;
             html += passiveChip(p, gameTagClass);
+        }
+    }
+
+    // Species abilities (Wood / Bones / Fish / etc.). The game shows these as
+    // text tags; we render our own icon chips so they live alongside H/A/D
+    // and the game's row can be hidden by the chips-enabled CSS rule.
+    const species = data.pets?.byId?.[pet.species];
+    if (species) {
+        if (!ctx.onlyPerfect) {
+            if (species.abilityName1) html += abilityChip(species.abilityName1, species.abilityValue1, gameTagClass);
+            if (species.abilityName2) html += abilityChip(species.abilityName2, species.abilityValue2, gameTagClass);
         }
     }
 
@@ -569,6 +599,31 @@ const PASSIVE_ICONS = {
 function passiveIcon(name) {
     const firstWord = (name || '').toLowerCase().split(/\s+/)[0];
     return PASSIVE_ICONS[firstWord] || null;
+}
+
+// Species ability icons. Names match the lowercase keys used by the game's
+// petAbility / drop type system (wood / bones / fish / etc.).
+const ABILITY_ICONS = {
+    wood:     'fa-tree',
+    bones:    'fa-bone',
+    fish:     'fa-fish',
+    flowers:  'fa-spa',
+    ore:      'fa-mountain',
+    veges:    'fa-carrot',
+    crystals: 'fa-gem',
+    logbooks: 'fa-book',
+};
+function abilityChip(name, value, gameTagClass) {
+    if (!name || value == null || value === 0) return '';
+    const key = String(name).toLowerCase();
+    const icon = ABILITY_ICONS[key];
+    const label = key.charAt(0).toUpperCase() + key.slice(1);
+    const cls = `${gameTagClass} rs-pet-chip rs-pet-chip-ability`.trim();
+    const tooltip = `${label} ${value}`;
+    const inner = icon
+        ? `<i class="fa-solid ${icon}"></i><span>${value}</span>`
+        : `${label[0]}${value}`;
+    return `<div class="${cls}" title="${escapeHtml(tooltip)}">${inner}</div>`;
 }
 
 function statChip(letter, value, isBest, gameTagClass) {

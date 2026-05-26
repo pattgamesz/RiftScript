@@ -885,6 +885,14 @@ riftscript-page .rs-row:last-child {
     font-size: 0.85em;
     opacity: 0.85;
 }
+
+/* When the chips toggle is on, hide the game's native .tags content on
+ * every pet row so only our icon chips show. The .tags container itself
+ * stays in the layout — only its children are hidden — to avoid breaking
+ * the flex spacing the game depends on. */
+taming-page.rs-pet-chips-on button.row .tags > * {
+    display: none !important;
+}
 .rs-pet-chip-best,
 .rs-pet-chip-best-perfect {
     border-color: #4ade80 !important;
