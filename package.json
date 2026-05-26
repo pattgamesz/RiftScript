@@ -1,6 +1,6 @@
 {
   "name": "riftscript",
-  "version": "1.5.9",
+  "version": "1.5.5",
   "private": true,
   "type": "module",
   "scripts": {

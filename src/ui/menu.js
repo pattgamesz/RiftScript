@@ -329,7 +329,16 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.5.1 – v1.5.3 — Pet panel polish + feedback link</div>
+                                <div class="rs-changelog-section">v1.5.5 — Pet chip icons, modal highlights, color split</div>
+                                <ul>
+                                    <li><b>Font Awesome icons</b> replace H/A/D and passive abbreviations on every pet chip — heart for Health, shield for Defense, burst for Attack, fist for Melee, crosshairs for Ranged, wand for Magic, etc. Tooltip on hover still shows the full passive name + level + effect.</li>
+                                    <li><b>Ability chips</b> (Wood / Bones / Fish / Flowers / Ore / Veges / Crystals / Logbooks) now render as our own icon chips at the front of every pet's chip row, replacing the game's native tags.</li>
+                                    <li><b>Toggle</b> "RiftScript pet chips" at the top of the Pets-sub-tab settings — off restores the game's native tags untouched.</li>
+                                    <li><b>Color split</b>: perfect markers (100% on a stat, 300% total, or level-4+ passive) are now <span style="color:#fbbf24">gold</span>; best-in-family stays <span style="color:#4ade80">green</span>.</li>
+                                    <li><b>Pet detail modal highlights</b>: opening any pet (incl. hatchlings) outlines the modal gold for perfect or green for best-in-family. Health / Attack / Defense / Total / passive rows also get a per-row tint so you can spot which specific stat outshines the rest of the family — instant keeper-check on a fresh hatch.</li>
+                                    <li>Guild Quests tab forces a fresh getGuild fetch every time it's opened, plus a notice reminding to visit the in-game Guild page first.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.5.1 – v1.5.3 — Pet panel polish + feedback link</div>
                                 <ul>
                                     <li><b>Expedition Calculator data persists across taming sub-tabs</b> — switching to the in-game Expedition / Breeding sub-tab no longer wipes the team. The reader now detects which sub-tab you're on and only treats the Pets sub-tab DOM as authoritative; other sub-tabs re-use the last good scrape.</li>
                                     <li>Team membership is now cached in localStorage so the expedition calc has data even after a hard refresh on the Expedition sub-tab.</li>
