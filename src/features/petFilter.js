@@ -249,18 +249,16 @@ function renderManagerTab() {
         </div>
         <div class="rs-pet-legend">
             <div class="rs-pet-legend-row">
-                <span class="rs-pet-chip">H95</span>
-                <span class="rs-pet-chip rs-pet-chip-passive">LF1</span>
-                <span>Health / Attack / Defense % &nbsp;·&nbsp; passive (initials + level)</span>
-            </div>
-            <div class="rs-pet-legend-row">
-                <span class="rs-pet-chip rs-pet-chip-best">A100</span>
-                <span>Perfect stat or family-best — green also on level-4 passives and 300% total</span>
+                <span class="rs-pet-chip"><i class="fa-solid fa-tree"></i><span>6</span></span>
+                <span class="rs-pet-chip rs-pet-chip-best"><i class="fa-solid fa-heart"></i><span>92</span></span>
+                <span class="rs-pet-chip rs-pet-chip-best-perfect"><i class="fa-solid fa-burst"></i><span>100</span></span>
+                <span class="rs-pet-chip rs-pet-chip-passive"><i class="fa-solid fa-sack-dollar"></i><span>1</span></span>
+                <span>Chips: ability / stat / passive — <span style="color:#4ade80">green</span> = best in family, <span style="color:#fbbf24">gold</span> = perfect (100% stat, 300% total, lvl 4+ passive). Hover for names.</span>
             </div>
             <div class="rs-pet-legend-row">
                 <span class="rs-pet-legend-star">★</span>
                 <span class="rs-pet-legend-dup"></span>
-                <span>Best in family (highest H+A+D) &nbsp;·&nbsp; exact duplicate (same H/A/D + passives)</span>
+                <span>★ best in family · highlighted row = exact duplicate · opening a pet outlines the modal green/gold (also on hatchlings).</span>
             </div>
         </div>
     `;
