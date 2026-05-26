@@ -51,6 +51,20 @@ const config = {
     logLevel: 'info',
 };
 
+// Stamp the deployed userscript version into the landing page. Targets the
+// <span class="version">v...</span> element specifically so it's idempotent —
+// replaces either the __VERSION__ placeholder or a previous version number.
+function stampIndexHtml() {
+    const path = 'public/index.html';
+    if (!fs.existsSync(path)) return;
+    const original = fs.readFileSync(path, 'utf8');
+    const stamped = original.replace(
+        /<span class="version">v[^<]+<\/span>/,
+        `<span class="version">v${VERSION}</span>`
+    );
+    if (stamped !== original) fs.writeFileSync(path, stamped);
+}
+
 if (watch) {
     const ctx = await esbuild.context(config);
     await ctx.watch();
@@ -58,5 +72,6 @@ if (watch) {
 } else {
     await esbuild.build(config);
     fs.copyFileSync('public/riftscript.user.js', 'plugin.js');
-    console.log(`Built v${VERSION} → plugin.js + public/riftscript.user.js`);
+    stampIndexHtml();
+    console.log(`Built v${VERSION} → plugin.js + public/riftscript.user.js + index.html`);
 }
