@@ -886,6 +886,26 @@ riftscript-page .rs-row:last-child {
     opacity: 0.85;
 }
 
+/* Per-icon colors — dampened palette (Tailwind 600-800 range + lower opacity)
+ * so each type is recognizable without screaming for attention. */
+.rs-pet-chip > i.fa-heart             { color: #dc2626; } /* Health */
+.rs-pet-chip > i.fa-burst             { color: #ea580c; } /* Attack */
+.rs-pet-chip > i.fa-shield-halved     { color: #2563eb; } /* Defense */
+.rs-pet-chip > i.fa-hand-fist         { color: #b45309; } /* Melee */
+.rs-pet-chip > i.fa-crosshairs        { color: #ca8a04; } /* Ranged */
+.rs-pet-chip > i.fa-wand-magic-sparkles { color: #7c3aed; } /* Magic */
+.rs-pet-chip > i.fa-sack-dollar       { color: #d97706; } /* Loot Find */
+.rs-pet-chip > i.fa-egg               { color: #eab308; } /* Egg Find */
+.rs-pet-chip > i.fa-bowl-food         { color: #991b1b; } /* Hunger */
+.rs-pet-chip > i.fa-tree              { color: #15803d; } /* Wood */
+.rs-pet-chip > i.fa-bone              { color: #d1d5db; } /* Bones */
+.rs-pet-chip > i.fa-fish              { color: #0891b2; } /* Fish */
+.rs-pet-chip > i.fa-spa               { color: #db2777; } /* Flowers */
+.rs-pet-chip > i.fa-mountain          { color: #6b7280; } /* Ore */
+.rs-pet-chip > i.fa-carrot            { color: #65a30d; } /* Veges */
+.rs-pet-chip > i.fa-gem               { color: #14b8a6; } /* Crystals */
+.rs-pet-chip > i.fa-book              { color: #92400e; } /* Logbooks */
+
 /* When the chips toggle is on, hide the game's native .tags content on
  * every pet row so only our icon chips show. The .tags container itself
  * stays in the layout — only its children are hidden — to avoid breaking
@@ -918,21 +938,21 @@ taming-page.rs-pet-chips-on button.row .tags > * {
     background: rgba(251, 191, 36, 0.12) !important;
     box-shadow: inset 3px 0 0 #fbbf24;
 }
-/* Best-in-family stat — only the number is green, outline and icon stay default */
-.rs-pet-chip-best > span {
-    color: #4ade80 !important;
+/* Best-in-family stat — green outline */
+.rs-pet-chip-best {
+    border-color: #4ade80 !important;
 }
-/* Perfect — only the number is gold */
-.rs-pet-chip-best-perfect > span {
-    color: #fbbf24 !important;
+/* Perfect — gold outline */
+.rs-pet-chip-best-perfect {
+    border-color: #fbbf24 !important;
 }
 .rs-pet-chip-passive {
     color: rgba(255,255,255,0.55);
     border-color: rgba(255,255,255,0.1);
 }
-/* Max-tier passive (level 4) — only the level number is gold */
-.rs-pet-chip-tier-max > span {
-    color: #fbbf24 !important;
+/* Max-tier passive (level 4) — gold outline */
+.rs-pet-chip-tier-max {
+    border-color: #fbbf24 !important;
 }
 /* Negative passives (Hunger) — always red regardless of tier */
 .rs-pet-chip-negative {
