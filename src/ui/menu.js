@@ -329,7 +329,14 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.5.5 — Pet chip icons, modal highlights, color split</div>
+                                <div class="rs-changelog-section">v1.5.6 — Per-icon chip colors (toggle, off by default)</div>
+                                <ul>
+                                    <li><b>Colored chip icons</b> — every chip type now has its own muted hue so the type reads at a glance: red Health, blue Defense, orange Attack, green Wood, cyan Fish, pink Flowers, gold Loot, white Egg, etc. Dampened palette (no neon).</li>
+                                    <li><b>New toggle</b> "Colored chip icons" in the Pets-sub-tab settings — <b>off by default</b>. Flip it on if you want the colored icons; turn it off for the plain look.</li>
+                                    <li>Best-in-family green outline and perfect-stat gold outline stay on regardless of the icon-color toggle.</li>
+                                    <li>Legend updated to reflect the new icons and color rules.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.5.5 — Pet chip icons, modal highlights, color split</div>
                                 <ul>
                                     <li><b>Font Awesome icons</b> replace H/A/D and passive abbreviations on every pet chip — heart for Health, shield for Defense, burst for Attack, fist for Melee, crosshairs for Ranged, wand for Magic, etc. Tooltip on hover still shows the full passive name + level + effect.</li>
                                     <li><b>Ability chips</b> (Wood / Bones / Fish / Flowers / Ore / Veges / Crystals / Logbooks) now render as our own icon chips at the front of every pet's chip row, replacing the game's native tags.</li>
