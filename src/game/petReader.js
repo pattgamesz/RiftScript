@@ -266,7 +266,11 @@ function maybeReadModal() {
         abilities,
     });
     lastReadModalEl = $modal[0];
-    events.emit('reader-pet-modal', { name, level, ...stats, passives, abilities });
+    events.emit('reader-pet-modal', {
+        name, level, ...stats, passives, abilities,
+        species, family: species?.family,
+        modalEl: $modal[0],
+    });
     // Re-trigger list update so chips reflect the newly cached pet
     setTimeout(trigger, 100);
 }

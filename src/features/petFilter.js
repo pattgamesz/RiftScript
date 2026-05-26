@@ -37,11 +37,17 @@ export function initPetFilter() {
         // Re-render so expedition tab reflects latest team composition / stats
         if (activeTab === 'expedition') renderPanel();
     });
-    events.on('reader-pet-modal', () => {
+    events.on('reader-pet-modal', (m) => {
         // Re-render so the "X cached" counter reflects the newly added pet,
         // then re-scan so chips on the existing row pick up the cached data.
         renderPanel();
         triggerPetReader();
+        // Outline the modal itself — gold if any stat is 100% or total is 300%,
+        // green if the pet's total beats every other pet of the same family in
+        // our cache. Works for the regular pet-detail modal AND the hatchling
+        // modal (both share the .header + Abilities pattern that petReader
+        // detects).
+        decoratePetModal(m);
     });
     window.addEventListener('resize', handleResize);
     // Sub-tab clicks inside taming-page (Pets / Ranch / Breeding / Expedition)
@@ -652,4 +658,74 @@ function passiveChip(passive, gameTagClass) {
         ? `<i class="fa-solid ${icon}"></i><span>${level}</span>`
         : (name.split(/\s+/).map(w => w[0]?.toUpperCase() || '').join('') + level);
     return `<div class="${cls}" title="${escapeHtml(tooltip)}">${inner}</div>`;
+}
+
+// ─── Pet detail / hatchling modal outline ──────────────────────────
+//
+// Called from the reader-pet-modal listener. Compares the modal pet's stats
+// against the same-family pets we've already scraped (lastPets via the
+// 'reader-pet' event cache) and applies an outline class:
+//   - gold  rs-pet-modal-perfect : any H/A/D = 100%, or total = 300%, or
+//                                  any non-Hunger passive is level 4+
+//   - green rs-pet-modal-best    : pet's total >= max total across family
+//   - per-row highlights also added to the in-modal Health / Attack /
+//     Defense / Total / passive lines so the user sees at a glance which
+//     stats outshine the rest of the family.
+function decoratePetModal({ health, attack, defense, total, passives, family, modalEl }) {
+    if (!modalEl) return;
+    const $modal = $(modalEl);
+    $modal.removeClass('rs-pet-modal-best rs-pet-modal-perfect');
+    $modal.find('.row').removeClass('rs-pet-modal-row-best rs-pet-modal-row-perfect');
+    if (health == null && attack == null && defense == null) return;
+
+    const totalCalc = total != null ? total : ((health || 0) + (attack || 0) + (defense || 0));
+    const isPerfectTotal = totalCalc >= 300;
+    const isPerfectH = health === 100;
+    const isPerfectA = attack === 100;
+    const isPerfectD = defense === 100;
+    const hasMaxPassive = Array.isArray(passives) && passives.some(p =>
+        p && p.name && (p.level || 0) >= 4 && !/hunger/i.test(p.name));
+    const isPerfect = isPerfectTotal || isPerfectH || isPerfectA || isPerfectD || hasMaxPassive;
+
+    // Family best lookup — use the cached pet list from the last reader-pet emit.
+    const family_pets = (events.last('reader-pet') || []).filter(p => p.family === family);
+    let bestTotal = 0;
+    const bestStat = { health: 0, attack: 0, defense: 0 };
+    for (const p of family_pets) {
+        const ps = p.cachedStats || p.apiStats || getPetStats(p);
+        if (!ps) continue;
+        const t = (ps.health || 0) + (ps.attack || 0) + (ps.defense || 0);
+        if (t > bestTotal) bestTotal = t;
+        for (const k of ['health', 'attack', 'defense']) {
+            if ((ps[k] || 0) > bestStat[k]) bestStat[k] = ps[k] || 0;
+        }
+    }
+    const isBest = totalCalc > 0 && totalCalc >= bestTotal;
+
+    // Whole-modal outline: gold wins over green.
+    if (isPerfect) $modal.addClass('rs-pet-modal-perfect');
+    else if (isBest) $modal.addClass('rs-pet-modal-best');
+
+    // Per-row highlights inside the modal.
+    const highlightRow = (label, perfect, best) => {
+        const $row = $modal.find(`.row:contains("${label}"), .stat:contains("${label}")`).first();
+        if (!$row.length) return;
+        if (perfect) $row.addClass('rs-pet-modal-row-perfect');
+        else if (best) $row.addClass('rs-pet-modal-row-best');
+    };
+    highlightRow('Health',  isPerfectH, (health  || 0) > 0 && health  >= bestStat.health);
+    highlightRow('Attack',  isPerfectA, (attack  || 0) > 0 && attack  >= bestStat.attack);
+    highlightRow('Defense', isPerfectD, (defense || 0) > 0 && defense >= bestStat.defense);
+    highlightRow('Total',   isPerfectTotal, totalCalc > 0 && totalCalc >= bestTotal);
+
+    // Per-passive highlights (level 4+, non-Hunger = gold).
+    if (Array.isArray(passives)) {
+        for (const p of passives) {
+            if (!p?.name) continue;
+            const isMax = (p.level || 0) >= 4 && !/hunger/i.test(p.name);
+            if (!isMax) continue;
+            const $row = $modal.find(`.row:contains("${p.name}")`).first();
+            if ($row.length) $row.addClass('rs-pet-modal-row-perfect');
+        }
+    }
 }

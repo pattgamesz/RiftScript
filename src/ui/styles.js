@@ -893,6 +893,31 @@ riftscript-page .rs-row:last-child {
 taming-page.rs-pet-chips-on button.row .tags > * {
     display: none !important;
 }
+
+/* Pet detail / hatchling modal outline. Applied to whichever element holds
+ * the modal — modal-component or .modal — so we use a generic selector. */
+.rs-pet-modal-best {
+    outline: 2px solid #4ade80;
+    box-shadow: 0 0 16px rgba(74, 222, 128, 0.35);
+    border-radius: 4px;
+}
+.rs-pet-modal-perfect {
+    outline: 2px solid #fbbf24;
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.45);
+    border-radius: 4px;
+}
+
+/* Per-row highlights inside the modal (Health / Attack / Defense / Total /
+ * passive rows). Uses a subtle background tint + accent border so the row
+ * still reads cleanly. */
+.rs-pet-modal-row-best {
+    background: rgba(74, 222, 128, 0.08) !important;
+    box-shadow: inset 3px 0 0 #4ade80;
+}
+.rs-pet-modal-row-perfect {
+    background: rgba(251, 191, 36, 0.12) !important;
+    box-shadow: inset 3px 0 0 #fbbf24;
+}
 /* Best-in-family stat (per H / A / D) — green */
 .rs-pet-chip-best {
     border-color: #4ade80 !important;
