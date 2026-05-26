@@ -502,6 +502,14 @@ function injectStatAndPassiveChips(pet, s, ctx) {
     let html = '';
     let hasKeeper = false;
 
+    // Species abilities first (Wood / Bones / Fish / etc.) so they read as the
+    // pet's primary identity, with H/A/D and passives after.
+    const species = data.pets?.byId?.[pet.species];
+    if (species && !ctx.onlyPerfect) {
+        if (species.abilityName1) html += abilityChip(species.abilityName1, species.abilityValue1, gameTagClass);
+        if (species.abilityName2) html += abilityChip(species.abilityName2, species.abilityValue2, gameTagClass);
+    }
+
     const renderStat = (letter, value, isBest) => {
         if (value == null) return;
         const isPerfectStat = value === 100;
@@ -522,17 +530,6 @@ function injectStatAndPassiveChips(pet, s, ctx) {
             if (ctx.onlyPerfect && !isPerfectPassive) continue;
             if (isPerfectPassive) hasKeeper = true;
             html += passiveChip(p, gameTagClass);
-        }
-    }
-
-    // Species abilities (Wood / Bones / Fish / etc.). The game shows these as
-    // text tags; we render our own icon chips so they live alongside H/A/D
-    // and the game's row can be hidden by the chips-enabled CSS rule.
-    const species = data.pets?.byId?.[pet.species];
-    if (species) {
-        if (!ctx.onlyPerfect) {
-            if (species.abilityName1) html += abilityChip(species.abilityName1, species.abilityValue1, gameTagClass);
-            if (species.abilityName2) html += abilityChip(species.abilityName2, species.abilityValue2, gameTagClass);
         }
     }
 
