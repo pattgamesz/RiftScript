@@ -21,6 +21,7 @@ const TAB_KEY = 'pet-active-tab';
 const EXP_WEEK_KEY = 'pet-exp-week-offset';
 const EXP_TIER_KEY = 'pet-exp-selected-tier';
 const CHIPS_ENABLED_KEY = 'pet-chips-enabled';
+const ICON_COLORS_KEY = 'pet-icon-colors-enabled';
 
 let activeTab = 'manager'; // 'manager' | 'expedition'
 
@@ -100,6 +101,10 @@ function bindDelegatedHandlers() {
     });
     $(document).on('change', `${sel} .rs-pet-chips-toggle`, function() {
         gset(CHIPS_ENABLED_KEY, $(this).is(':checked'));
+        triggerPetReader();
+    });
+    $(document).on('change', `${sel} .rs-pet-icon-colors-toggle`, function() {
+        gset(ICON_COLORS_KEY, $(this).is(':checked'));
         triggerPetReader();
     });
 }
@@ -230,6 +235,13 @@ function renderManagerTab() {
             <div class="rs-pet-label">RiftScript pet chips</div>
             <label class="rs-toggle">
                 <input type="checkbox" class="rs-pet-chips-toggle" ${getOnDefault(CHIPS_ENABLED_KEY) ? 'checked' : ''}>
+                <span class="rs-toggle-slider"></span>
+            </label>
+        </div>
+        <div class="rs-pet-row">
+            <div class="rs-pet-label">Colored chip icons</div>
+            <label class="rs-toggle">
+                <input type="checkbox" class="rs-pet-icon-colors-toggle" ${gget(ICON_COLORS_KEY) ? 'checked' : ''}>
                 <span class="rs-toggle-slider"></span>
             </label>
         </div>
@@ -419,10 +431,14 @@ function applyToList(pets) {
     const sort = gget(SORT_KEY, 'default');
     const onlyPerfect = !!gget(PERFECT_KEY);
     const chipsEnabled = getOnDefault(CHIPS_ENABLED_KEY);
+    // Icon colors default OFF — user opts in via the toggle.
+    const iconColorsEnabled = !!gget(ICON_COLORS_KEY);
 
-    // Toggle game-tag hiding via a class on taming-page. The CSS rule lives in
-    // styles.js — when chips are off we show the game's native tags untouched.
-    $('taming-page').toggleClass('rs-pet-chips-on', chipsEnabled);
+    // Toggle game-tag hiding + icon-coloring via classes on taming-page.
+    // CSS rules live in styles.js — best/perfect border colors are always on.
+    $('taming-page')
+        .toggleClass('rs-pet-chips-on', chipsEnabled)
+        .toggleClass('rs-pet-icon-colors-on', iconColorsEnabled);
 
     // Attach stats — prefer getUser API (unique per pet ID), fall back to modal-scrape cache.
     for (const pet of pets) pet.cachedStats = pet.apiStats || getPetStats(pet);

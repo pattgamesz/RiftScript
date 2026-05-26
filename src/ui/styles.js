@@ -887,24 +887,27 @@ riftscript-page .rs-row:last-child {
 }
 
 /* Per-icon colors — dampened palette (Tailwind 600-800 range + lower opacity)
- * so each type is recognizable without screaming for attention. */
-.rs-pet-chip > i.fa-heart             { color: #dc2626; } /* Health */
-.rs-pet-chip > i.fa-burst             { color: #ea580c; } /* Attack */
-.rs-pet-chip > i.fa-shield-halved     { color: #2563eb; } /* Defense */
-.rs-pet-chip > i.fa-hand-fist         { color: #b45309; } /* Melee */
-.rs-pet-chip > i.fa-crosshairs        { color: #ca8a04; } /* Ranged */
-.rs-pet-chip > i.fa-wand-magic-sparkles { color: #7c3aed; } /* Magic */
-.rs-pet-chip > i.fa-sack-dollar       { color: #eab308; } /* Loot Find — gold */
-.rs-pet-chip > i.fa-egg               { color: #f3f4f6; } /* Egg Find — off-white */
-.rs-pet-chip > i.fa-bowl-food         { color: #991b1b; } /* Hunger */
-.rs-pet-chip > i.fa-tree              { color: #15803d; } /* Wood */
-.rs-pet-chip > i.fa-bone              { color: #d1d5db; } /* Bones */
-.rs-pet-chip > i.fa-fish              { color: #0891b2; } /* Fish */
-.rs-pet-chip > i.fa-spa               { color: #db2777; } /* Flowers */
-.rs-pet-chip > i.fa-mountain          { color: #6b7280; } /* Ore */
-.rs-pet-chip > i.fa-carrot            { color: #65a30d; } /* Veges */
-.rs-pet-chip > i.fa-gem               { color: #14b8a6; } /* Crystals */
-.rs-pet-chip > i.fa-book              { color: #92400e; } /* Logbooks */
+ * so each type is recognizable without screaming for attention. Gated behind
+ * the rs-pet-icon-colors-on class on taming-page so users can toggle the
+ * coloring off and fall back to default-grey icons. Border colors on
+ * best/perfect/tier-max chips stay on regardless. */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-heart             { color: #dc2626; } /* Health */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-burst             { color: #ea580c; } /* Attack */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-shield-halved     { color: #2563eb; } /* Defense */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-hand-fist         { color: #b45309; } /* Melee */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-crosshairs        { color: #ca8a04; } /* Ranged */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-wand-magic-sparkles { color: #7c3aed; } /* Magic */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-sack-dollar       { color: #eab308; } /* Loot Find — gold */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-egg               { color: #f3f4f6; } /* Egg Find — off-white */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-bowl-food         { color: #991b1b; } /* Hunger */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-tree              { color: #15803d; } /* Wood */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-bone              { color: #d1d5db; } /* Bones */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-fish              { color: #0891b2; } /* Fish */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-spa               { color: #db2777; } /* Flowers */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-mountain          { color: #6b7280; } /* Ore */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-carrot            { color: #65a30d; } /* Veges */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-gem               { color: #14b8a6; } /* Crystals */
+taming-page.rs-pet-icon-colors-on .rs-pet-chip > i.fa-book              { color: #92400e; } /* Logbooks */
 
 /* When the chips toggle is on, hide the game's native .tags content on
  * every pet row so only our icon chips show. The .tags container itself
