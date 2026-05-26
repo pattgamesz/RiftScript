@@ -918,23 +918,20 @@ taming-page.rs-pet-chips-on button.row .tags > * {
     background: rgba(251, 191, 36, 0.12) !important;
     box-shadow: inset 3px 0 0 #fbbf24;
 }
-/* Best-in-family stat (per H / A / D) — green */
+/* Best-in-family stat (per H / A / D) — green outline only, text stays default */
 .rs-pet-chip-best {
     border-color: #4ade80 !important;
-    color: #4ade80 !important;
 }
-/* Perfect: 100% on a single stat, or 300% total. Always wins over best-in-family. */
+/* Perfect: 100% on a single stat, or 300% total — gold outline only */
 .rs-pet-chip-best-perfect {
     border-color: #fbbf24 !important;
-    color: #fbbf24 !important;
 }
 .rs-pet-chip-passive {
     color: rgba(255,255,255,0.55);
     border-color: rgba(255,255,255,0.1);
 }
-/* Max-tier passive (level 4) — gold like other perfect markers */
+/* Max-tier passive (level 4) — gold outline */
 .rs-pet-chip-tier-max {
-    color: #fbbf24 !important;
     border-color: #fbbf24 !important;
 }
 /* Negative passives (Hunger) — always red regardless of tier */
