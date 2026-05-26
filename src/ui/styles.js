@@ -918,21 +918,21 @@ taming-page.rs-pet-chips-on button.row .tags > * {
     background: rgba(251, 191, 36, 0.12) !important;
     box-shadow: inset 3px 0 0 #fbbf24;
 }
-/* Best-in-family stat (per H / A / D) — green outline only, text stays default */
-.rs-pet-chip-best {
-    border-color: #4ade80 !important;
+/* Best-in-family stat — only the number is green, outline and icon stay default */
+.rs-pet-chip-best > span {
+    color: #4ade80 !important;
 }
-/* Perfect: 100% on a single stat, or 300% total — gold outline only */
-.rs-pet-chip-best-perfect {
-    border-color: #fbbf24 !important;
+/* Perfect — only the number is gold */
+.rs-pet-chip-best-perfect > span {
+    color: #fbbf24 !important;
 }
 .rs-pet-chip-passive {
     color: rgba(255,255,255,0.55);
     border-color: rgba(255,255,255,0.1);
 }
-/* Max-tier passive (level 4) — gold outline */
-.rs-pet-chip-tier-max {
-    border-color: #fbbf24 !important;
+/* Max-tier passive (level 4) — only the level number is gold */
+.rs-pet-chip-tier-max > span {
+    color: #fbbf24 !important;
 }
 /* Negative passives (Hunger) — always red regardless of tier */
 .rs-pet-chip-negative {
