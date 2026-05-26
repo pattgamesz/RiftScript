@@ -894,8 +894,8 @@ riftscript-page .rs-row:last-child {
 .rs-pet-chip > i.fa-hand-fist         { color: #b45309; } /* Melee */
 .rs-pet-chip > i.fa-crosshairs        { color: #ca8a04; } /* Ranged */
 .rs-pet-chip > i.fa-wand-magic-sparkles { color: #7c3aed; } /* Magic */
-.rs-pet-chip > i.fa-sack-dollar       { color: #d97706; } /* Loot Find */
-.rs-pet-chip > i.fa-egg               { color: #eab308; } /* Egg Find */
+.rs-pet-chip > i.fa-sack-dollar       { color: #eab308; } /* Loot Find — gold */
+.rs-pet-chip > i.fa-egg               { color: #f3f4f6; } /* Egg Find — off-white */
 .rs-pet-chip > i.fa-bowl-food         { color: #991b1b; } /* Hunger */
 .rs-pet-chip > i.fa-tree              { color: #15803d; } /* Wood */
 .rs-pet-chip > i.fa-bone              { color: #d1d5db; } /* Bones */
