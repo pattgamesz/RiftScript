@@ -515,11 +515,12 @@ function injectStatAndPassiveChips(pet, s, ctx) {
         const isPerfectStat = value === 100;
         if (ctx.onlyPerfect && !isPerfectStat) return;
         if (isPerfectStat) hasKeeper = true;
-        html += statChip(letter, value, isBest || isPerfectStat, gameTagClass);
+        // Perfect (100% stat OR 300% total) → gold. Best-in-family → green.
+        html += statChip(letter, value, isBest, gameTagClass, isPerfect || isPerfectStat);
     };
-    renderStat('H', s.health, isPerfect || s.health === fbest.health);
-    renderStat('A', s.attack, isPerfect || s.attack === fbest.attack);
-    renderStat('D', s.defense, isPerfect || s.defense === fbest.defense);
+    renderStat('H', s.health, s.health === fbest.health);
+    renderStat('A', s.attack, s.attack === fbest.attack);
+    renderStat('D', s.defense, s.defense === fbest.defense);
 
     if (Array.isArray(s.passives)) {
         for (const p of s.passives) {
@@ -623,9 +624,13 @@ function abilityChip(name, value, gameTagClass) {
     return `<div class="${cls}" title="${escapeHtml(tooltip)}">${inner}</div>`;
 }
 
-function statChip(letter, value, isBest, gameTagClass) {
+function statChip(letter, value, isBest, gameTagClass, isPerfect = false) {
     if (value == null) return '';
-    const cls = `${gameTagClass} rs-pet-chip${isBest ? ' rs-pet-chip-best' : ''}`.trim();
+    // Perfect (100%) > best-in-family. Gold beats green when both apply.
+    const colorCls = isPerfect ? 'rs-pet-chip-best-perfect'
+                  : isBest    ? 'rs-pet-chip-best'
+                  : '';
+    const cls = `${gameTagClass} rs-pet-chip ${colorCls}`.trim();
     const meta = STAT_ICONS[letter];
     const v = Math.round(value);
     if (!meta) return `<div class="${cls}">${letter}${v}</div>`;

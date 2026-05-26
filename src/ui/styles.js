@@ -893,20 +893,24 @@ riftscript-page .rs-row:last-child {
 taming-page.rs-pet-chips-on button.row .tags > * {
     display: none !important;
 }
-.rs-pet-chip-best,
-.rs-pet-chip-best-perfect {
+/* Best-in-family stat (per H / A / D) — green */
+.rs-pet-chip-best {
     border-color: #4ade80 !important;
     color: #4ade80 !important;
+}
+/* Perfect: 100% on a single stat, or 300% total. Always wins over best-in-family. */
+.rs-pet-chip-best-perfect {
+    border-color: #fbbf24 !important;
+    color: #fbbf24 !important;
 }
 .rs-pet-chip-passive {
     color: rgba(255,255,255,0.55);
     border-color: rgba(255,255,255,0.1);
 }
-/* Max-tier passive (level 4) gets the green highlight. Lower tiers use the
-   default passive styling. */
+/* Max-tier passive (level 4) — gold like other perfect markers */
 .rs-pet-chip-tier-max {
-    color: #4ade80 !important;
-    border-color: #4ade80 !important;
+    color: #fbbf24 !important;
+    border-color: #fbbf24 !important;
 }
 /* Negative passives (Hunger) — always red regardless of tier */
 .rs-pet-chip-negative {
