@@ -965,6 +965,11 @@ taming-page.rs-pet-chips-on button.row .tags > * {
     color: #fbbf24;
     border-left-color: #fbbf24;
 }
+.rs-pet-modal-breeding-info-green {
+    background: rgba(74, 222, 128, 0.10);
+    color: #4ade80;
+    border-left-color: #4ade80;
+}
 /* Best-in-family stat — green outline */
 .rs-pet-chip-best {
     border-color: #4ade80 !important;

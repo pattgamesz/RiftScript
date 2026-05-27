@@ -769,38 +769,45 @@ function decoratePetModal({ health, attack, defense, total, passives, family, mo
         }
     }
 
-    // 4-passive breeding check. Surfaces how many other pets in the same
-    // family already have a 4-passive roll — important for deciding whether
-    // a fresh hatchling is worth keeping as a breeder.
-    const passiveCount = Array.isArray(passives) ? passives.filter(p => p?.name).length : 0;
-    const selfHas4 = passiveCount >= 4;
+    // 4-passive breeding check — only show a banner when the pet itself has
+    // 4 passives. <4 passives = no banner (irrelevant for breeding decisions).
+    $modal.find('.rs-pet-modal-breeding-info').remove();
+    const realPassives = Array.isArray(passives) ? passives.filter(p => p?.name) : [];
+    if (realPassives.length < 4) return;
+
+    // All-perfect = every passive is level 4+ and none is Hunger. That's the
+    // ultimate breeder roll → gold banner. Otherwise it's still a 4-passive
+    // keeper, just not maxed → green banner.
+    const allPerfect = realPassives.every(p =>
+        (p.level || 0) >= 4 && !/hunger/i.test(p.name)
+    );
+
+    // Count other 4-passive pets in the family (any level). Subtract self if
+    // the modal pet is in the cache (regular click); hatchlings aren't cached
+    // yet so the count is already correct for them.
     let fourPassiveInFamily = 0;
     for (const p of family_pets) {
         const ps = p.cachedStats || p.apiStats || getPetStats(p);
         const cnt = Array.isArray(ps?.passives) ? ps.passives.filter(x => x?.name).length : 0;
         if (cnt >= 4) fourPassiveInFamily++;
     }
-    // The clicked-from-the-list pet usually shows up in family_pets too, so
-    // subtract one to get the count of OTHER 4-passive pets. Hatchlings won't
-    // be in family_pets yet, so this stays correct.
-    const others = selfHas4 ? Math.max(0, fourPassiveInFamily - 1) : fourPassiveInFamily;
+    const others = Math.max(0, fourPassiveInFamily - 1);
 
-    let msg = '';
-    let cls = 'rs-pet-modal-breeding-info';
-    if (selfHas4 && others === 0) {
-        msg = '✨ First 4-passive pet in this family — keeper!';
-        cls += ' rs-pet-modal-breeding-info-gold';
-    } else if (selfHas4) {
-        msg = `✓ 4 passives — family already has ${others} other 4-passive pet${others > 1 ? 's' : ''}`;
-        cls += ' rs-pet-modal-breeding-info-gold';
-    } else if (fourPassiveInFamily > 0) {
-        msg = `Family has ${fourPassiveInFamily} pet${fourPassiveInFamily > 1 ? 's' : ''} with 4 passives`;
+    let msg;
+    let variant;
+    if (allPerfect) {
+        variant = 'rs-pet-modal-breeding-info-gold';
+        msg = others === 0
+            ? '✨ First 4-perfect-passive pet in this family — keeper!'
+            : `✓ 4 perfect passives — family has ${others} other 4-passive pet${others !== 1 ? 's' : ''}`;
     } else {
-        msg = 'No 4-passive pets in this family yet';
+        variant = 'rs-pet-modal-breeding-info-green';
+        msg = others === 0
+            ? 'First pet in this family with 4 passives'
+            : `4 passives — family has ${others} other 4-passive pet${others !== 1 ? 's' : ''}`;
     }
 
-    $modal.find('.rs-pet-modal-breeding-info').remove();
-    const $info = $(`<div class="${cls}">${escapeHtml(msg)}</div>`);
+    const $info = $(`<div class="rs-pet-modal-breeding-info ${variant}">${escapeHtml(msg)}</div>`);
     const $header = $modal.find('.header').first();
     if ($header.length) $header.after($info);
     else $modal.prepend($info);
