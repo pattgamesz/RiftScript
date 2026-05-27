@@ -523,11 +523,17 @@ function injectStatAndPassiveChips(pet, s, ctx) {
     let hasKeeper = false;
 
     // Species abilities first (Wood / Bones / Fish / etc.) so they read as the
-    // pet's primary identity, with H/A/D and passives after.
+    // pet's primary identity, with H/A/D and passives after. When a pet has
+    // only one ability, pad the second slot with an invisible spacer chip so
+    // the H/A/D + passive chips line up across every row.
     const species = data.pets?.byId?.[pet.species];
     if (species && !ctx.onlyPerfect) {
         if (species.abilityName1) html += abilityChip(species.abilityName1, species.abilityValue1, gameTagClass);
-        if (species.abilityName2) html += abilityChip(species.abilityName2, species.abilityValue2, gameTagClass);
+        if (species.abilityName2) {
+            html += abilityChip(species.abilityName2, species.abilityValue2, gameTagClass);
+        } else if (species.abilityName1) {
+            html += `<div class="${gameTagClass} rs-pet-chip rs-pet-chip-spacer" aria-hidden="true"><i class="fa-solid fa-leaf"></i><span>0</span></div>`.trim();
+        }
     }
 
     const renderStat = (letter, value, isBest) => {

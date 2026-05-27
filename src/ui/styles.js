@@ -885,6 +885,11 @@ riftscript-page .rs-row:last-child {
     font-size: 0.85em;
     opacity: 0.85;
 }
+/* Placeholder for pets with only one ability — takes the same space as a
+ * normal chip so H/A/D + passive columns line up across every row. */
+.rs-pet-chip-spacer {
+    visibility: hidden;
+}
 
 /* Per-icon colors — dampened palette (Tailwind 600-800 range + lower opacity)
  * so each type is recognizable without screaming for attention. Gated behind
