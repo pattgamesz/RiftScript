@@ -543,7 +543,13 @@ function injectStatAndPassiveChips(pet, s, ctx) {
     renderStat('D', s.defense, s.defense === fbest.defense);
 
     if (Array.isArray(s.passives)) {
-        for (const p of s.passives) {
+        // Sort passives into a stable display order before rendering so each
+        // pet's chip row reads the same way (defensive → utility → offensive
+        // → hunger). Sort is non-destructive — keeps original array intact.
+        const sortedPassives = [...s.passives].sort(
+            (a, b) => passiveSortKey(a?.name) - passiveSortKey(b?.name)
+        );
+        for (const p of sortedPassives) {
             if (!p?.name) continue;
             const isMaxTier = (p.level || 0) >= 4;
             const isNegative = /hunger/i.test(p.name);
@@ -617,6 +623,20 @@ const PASSIVE_ICONS = {
 function passiveIcon(name) {
     const firstWord = (name || '').toLowerCase().split(/\s+/)[0];
     return PASSIVE_ICONS[firstWord] || null;
+}
+// Fixed display order for passive chips so the row reads consistently across
+// every pet. Defensive triplet first, then utility, then offensive, with
+// negative Hunger pinned at the end. Unknown passives sort after Hunger.
+const PASSIVE_ORDER = [
+    'melee', 'ranged', 'magic',
+    'loot', 'egg',
+    'health', 'attack', 'defense',
+    'hunger',
+];
+function passiveSortKey(name) {
+    const firstWord = (name || '').toLowerCase().split(/\s+/)[0];
+    const i = PASSIVE_ORDER.indexOf(firstWord);
+    return i >= 0 ? i : PASSIVE_ORDER.length;
 }
 
 // Species ability icons. Names match the lowercase keys used by the game's
