@@ -946,6 +946,25 @@ taming-page.rs-pet-chips-on button.row .tags > * {
     background: rgba(251, 191, 36, 0.12) !important;
     box-shadow: inset 3px 0 0 #fbbf24;
 }
+
+/* Breeding info banner inside the pet detail / hatchling modal — tells the
+ * user whether the family already has 4-passive pets so they can judge
+ * whether a fresh hatch is worth keeping as a breeder. */
+.rs-pet-modal-breeding-info {
+    margin: 6px 12px 4px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.75);
+    border-left: 3px solid rgba(255, 255, 255, 0.25);
+    border-radius: 3px;
+    font-size: 0.85em;
+    line-height: 1.4;
+}
+.rs-pet-modal-breeding-info-gold {
+    background: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+    border-left-color: #fbbf24;
+}
 /* Best-in-family stat — green outline */
 .rs-pet-chip-best {
     border-color: #4ade80 !important;
