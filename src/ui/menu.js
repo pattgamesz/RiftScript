@@ -329,7 +329,20 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.5.6 — Per-icon chip colors (toggle, off by default)</div>
+                                <div class="rs-changelog-section">v1.5.7 — Pet chip layout polish + 4-passive breeding banner</div>
+                                <ul>
+                                    <li><b>Stable passive chip order</b> — every pet's chip row now reads the same way: Melee Block → Ranged Evade → Magic Resist → Loot Find → Egg Find → Health / Attack / Defense → Hunger last. No more shuffling between pets.</li>
+                                    <li><b>Single-ability pets line up too</b> — pets with only one ability get an invisible spacer chip in the second slot, so H/A/D and passive columns are aligned across every row.</li>
+                                    <li><b>4-passive breeding banner</b> in the pet detail / hatchling modal — instant verdict on whether the roll is a keeper:
+                                        <ul>
+                                            <li><b>Gold</b> when all 4 passives are level 4+ (no Hunger): "✨ First 4-perfect-passive pet in this family — keeper!" or "✓ 4 perfect passives — family has N other 4-passive pet(s)"</li>
+                                            <li><b>Green</b> when 4 passives but not all perfect: "First pet in this family with 4 passives" or similar with the family count</li>
+                                            <li>No banner shown when the pet has fewer than 4 passives.</li>
+                                        </ul>
+                                    </li>
+                                    <li>rift-script.web.app landing page refreshed with the actual current feature list + auto-stamped version footer.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.5.6 — Per-icon chip colors (toggle, off by default)</div>
                                 <ul>
                                     <li><b>Colored chip icons</b> — every chip type now has its own muted hue so the type reads at a glance: red Health, blue Defense, orange Attack, green Wood, cyan Fish, pink Flowers, gold Loot, white Egg, etc. Dampened palette (no neon).</li>
                                     <li><b>New toggle</b> "Colored chip icons" in the Pets-sub-tab settings — <b>off by default</b>. Flip it on if you want the colored icons; turn it off for the plain look.</li>
