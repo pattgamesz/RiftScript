@@ -2,6 +2,7 @@
 import * as events from '../core/events.js';
 import * as storage from '../core/storage.js';
 import * as settings from '../core/settings.js';
+import { pollWhileVisible } from '../core/util.js';
 import { getMode } from '../game/mode.js';
 import { getDiscordUser, isLinked, openOAuth, unlinkDiscord, setTimer } from '../features/discord.js';
 import { openCombatSimPage } from './combatSimPage.js';
@@ -139,7 +140,7 @@ const GAME_PAGES = 'skill-page, equipment-page, home-page, market-page, merchant
 export function initMenu() {
     migrateUISettings();
     applyUIChanges();
-    setInterval(injectNavButton, 1000);
+    pollWhileVisible(injectNavButton, 1000);
 
     // Re-apply UI changes once game mode is detected (settings may have been
     // saved under a mode-scoped key before this fix)

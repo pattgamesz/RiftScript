@@ -109,13 +109,19 @@ function isQuestCacheStale() {
     return !!questCache?.effectiveResetAt && Date.now() >= questCache.effectiveResetAt;
 }
 
+let lastPageType = null;
 function onPage(page) {
+    const wasMarket = lastPageType === 'market';
+    lastPageType = page?.type || null;
     if (page?.type !== 'market') return;
-    // Reset the active filter every time you enter the market (incl. refresh).
-    // Saved filters stay in the Saved tab so you can re-apply them with a click.
-    currentFilter = { type: 'None', amount: 0, search: '', tribute: null };
-    writeJSON(CURRENT_KEY, currentFilter);
-    setMarketSearch('');
+    // Only wipe the filter on true entry (navigating in from another page).
+    // Don't wipe on sub-tab clicks or re-emits, which would clobber the
+    // user's live search / amount inputs mid-typing.
+    if (!wasMarket) {
+        currentFilter = { type: 'None', amount: 0, search: '', tribute: null };
+        writeJSON(CURRENT_KEY, currentFilter);
+        setMarketSearch('');
+    }
     retryAfter(ensurePanel);
     // Pre-fetch guild quests so the tab count shows up immediately
     loadQuestsAndRender();

@@ -97,3 +97,12 @@ export const MOBILE_BREAKPOINT = 750;
 export function retryAfter(fn, delays = [200, 800]) {
     for (const ms of delays) setTimeout(fn, ms);
 }
+
+// setInterval that skips ticks when the browser tab is hidden. Same return
+// value as setInterval (an id you can pass to clearInterval).
+export function pollWhileVisible(fn, ms) {
+    return setInterval(() => {
+        if (document.hidden) return;
+        fn();
+    }, ms);
+}

@@ -1,10 +1,10 @@
 // DOM readers — extract game state from the page
 import * as events from '../core/events.js';
-import { parseNumber, expToLevel } from '../core/util.js';
+import { parseNumber, expToLevel, pollWhileVisible } from '../core/util.js';
 import { data } from './data.js';
 
 export function initReaders() {
-    setInterval(readAll, 1000);
+    pollWhileVisible(readAll, 1000);
 }
 
 function readAll() {

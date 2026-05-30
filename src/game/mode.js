@@ -1,10 +1,11 @@
 // Detects whether the player is in Multiplayer or Singleplayer mode
 import * as events from '../core/events.js';
+import { pollWhileVisible } from '../core/util.js';
 
 let currentMode = null;
 
 export function initModeDetector() {
-    setInterval(detectMode, 1000);
+    pollWhileVisible(detectMode, 1000);
 }
 
 export function getMode() {

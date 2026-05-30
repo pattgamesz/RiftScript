@@ -2,7 +2,7 @@
 // Emits 'reader-pet' with a list of {species, family, name, level, location, element}.
 // Also watches for pet detail modals to scrape per-pet stats into our cache.
 import * as events from '../core/events.js';
-import { parseNumber } from '../core/util.js';
+import { parseNumber, debounce } from '../core/util.js';
 import { data } from './data.js';
 import { setPetStats } from '../core/petStats.js';
 import { api } from '../core/api.js';
@@ -50,8 +50,12 @@ export function initPetReader() {
         lastClickedRow = this;
     });
 
-    // Watch for pet detail modals appearing anywhere in the DOM
-    modalObserver = new MutationObserver(() => maybeReadModal());
+    // Watch for pet detail modals appearing anywhere in the DOM. The observer
+    // is on document.body because the modal is inserted as a top-level sibling
+    // of taming-page; debounce the callback so Angular's frequent re-renders
+    // during taming sub-tab switches don't trigger 50+ regex / DOM scans.
+    const debouncedReadModal = debounce(maybeReadModal, 80);
+    modalObserver = new MutationObserver(debouncedReadModal);
     modalObserver.observe(document.body, { childList: true, subtree: true });
 }
 

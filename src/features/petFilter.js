@@ -9,7 +9,7 @@ import { trigger as triggerPetReader } from '../game/petReader.js';
 import { data } from '../game/data.js';
 import { get as gget, set as gset, getOnDefault } from '../core/settings.js';
 import { getPetStats, getCachedCount } from '../core/petStats.js';
-import { formatNumber, escapeHtml, MOBILE_BREAKPOINT, retryAfter } from '../core/util.js';
+import { formatNumber, escapeHtml, MOBILE_BREAKPOINT, retryAfter, debounce, pollWhileVisible } from '../core/util.js';
 import { getExpeditionResults, scrapeRotationsFromDOM } from './expeditionCalc.js';
 
 const PANEL_ID = 'rs-pet-panel';
@@ -38,17 +38,16 @@ export function initPetFilter() {
         // Re-render so expedition tab reflects latest team composition / stats
         if (activeTab === 'expedition') renderPanel();
     });
-    events.on('reader-pet-modal', (m) => {
-        // Re-render so the "X cached" counter reflects the newly added pet,
-        // then re-scan so chips on the existing row pick up the cached data.
+    // Modal decoration is cheap — apply it immediately for snappy feel.
+    // The follow-up panel re-render + reader trigger are heavier; debounce
+    // them so rapid pet clicks don't stack up full re-renders.
+    const debouncedPostModal = debounce(() => {
         renderPanel();
         triggerPetReader();
-        // Outline the modal itself — gold if any stat is 100% or total is 300%,
-        // green if the pet's total beats every other pet of the same family in
-        // our cache. Works for the regular pet-detail modal AND the hatchling
-        // modal (both share the .header + Abilities pattern that petReader
-        // detects).
+    }, 120);
+    events.on('reader-pet-modal', (m) => {
         decoratePetModal(m);
+        debouncedPostModal();
     });
     window.addEventListener('resize', handleResize);
     // Sub-tab clicks inside taming-page (Pets / Ranch / Breeding / Expedition)
@@ -57,7 +56,8 @@ export function initPetFilter() {
     // taming sub-tab including the in-game Expedition view. ensurePanel handles
     // its own renderPanel; we don't trigger the pet reader here because that
     // could re-render the panel out from under an in-progress click.
-    setInterval(() => {
+    // Skips while the tab is hidden to avoid background CPU work.
+    pollWhileVisible(() => {
         if ($('taming-page').length && !$(`#${PANEL_ID}`).length) {
             ensurePanel();
         }
