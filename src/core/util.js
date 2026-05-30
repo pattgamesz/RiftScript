@@ -106,3 +106,26 @@ export function pollWhileVisible(fn, ms) {
         fn();
     }, ms);
 }
+
+// Self-terminating poller. fn() returns false to signal "done, stop polling".
+// Skips ticks while the tab is hidden. Returns a handle with start/stop —
+// callers can stop manually or call start() to resume after a previous stop.
+export function pollUntilDone(fn, ms) {
+    let id = null;
+    const handle = {
+        start() {
+            if (id) return;
+            id = setInterval(() => {
+                if (document.hidden) return;
+                if (fn() === false) handle.stop();
+            }, ms);
+        },
+        stop() {
+            if (id) clearInterval(id);
+            id = null;
+        },
+        get running() { return id !== null; },
+    };
+    handle.start();
+    return handle;
+}

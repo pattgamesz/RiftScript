@@ -9,7 +9,7 @@ import { trigger as triggerPetReader } from '../game/petReader.js';
 import { data } from '../game/data.js';
 import { get as gget, set as gset, getOnDefault } from '../core/settings.js';
 import { getPetStats, getCachedCount } from '../core/petStats.js';
-import { formatNumber, escapeHtml, MOBILE_BREAKPOINT, retryAfter, debounce, pollWhileVisible } from '../core/util.js';
+import { formatNumber, escapeHtml, MOBILE_BREAKPOINT, retryAfter, debounce, pollUntilDone } from '../core/util.js';
 import { getExpeditionResults, scrapeRotationsFromDOM } from './expeditionCalc.js';
 
 const PANEL_ID = 'rs-pet-panel';
@@ -24,6 +24,7 @@ const CHIPS_ENABLED_KEY = 'pet-chips-enabled';
 const ICON_COLORS_KEY = 'pet-icon-colors-enabled';
 
 let activeTab = 'manager'; // 'manager' | 'expedition'
+let panelPoller = null;    // self-stopping poller, only runs while on taming
 
 export function initPetFilter() {
     activeTab = gget(TAB_KEY, 'manager');
@@ -52,15 +53,13 @@ export function initPetFilter() {
     window.addEventListener('resize', handleResize);
     // Sub-tab clicks inside taming-page (Pets / Ranch / Breeding / Expedition)
     // re-render Angular's groups container without firing a 'page' event, so
-    // our injected panel disappears. Poll-and-reinject keeps it alive on every
-    // taming sub-tab including the in-game Expedition view. ensurePanel handles
-    // its own renderPanel; we don't trigger the pet reader here because that
-    // could re-render the panel out from under an in-progress click.
-    // Skips while the tab is hidden to avoid background CPU work.
-    pollWhileVisible(() => {
-        if ($('taming-page').length && !$(`#${PANEL_ID}`).length) {
-            ensurePanel();
-        }
+    // our injected panel disappears. The poller keeps the panel alive while
+    // we're on taming, and self-stops the moment we leave the page. onPage
+    // re-arms it on the next taming entry.
+    panelPoller = pollUntilDone(() => {
+        if (!$('taming-page').length) return false; // left taming → stop
+        if (!$(`#${PANEL_ID}`).length) ensurePanel();
+        // Keep polling — the user can still switch sub-tabs and lose the panel.
     }, 1000);
 
     // Delegated handlers — survive every renderPanel re-render because they're
@@ -113,11 +112,14 @@ function onPage(page) {
     if (page?.type !== 'taming') {
         // Clean up the panel so it doesn't linger on other pages — Angular
         // keeps taming-page in the DOM after navigation, so our injected
-        // panel would otherwise stay visible on top.
+        // panel would otherwise stay visible on top. Poller self-stops on
+        // its next tick when taming-page is gone.
         $(`#${PANEL_ID}`).remove();
         return;
     }
     retryAfter(ensurePanel);
+    // Re-arm the panel poller in case we just navigated back to taming.
+    if (panelPoller && !panelPoller.running) panelPoller.start();
 }
 
 function ensurePanel() {

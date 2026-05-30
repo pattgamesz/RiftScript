@@ -1,11 +1,21 @@
 // Detects whether the player is in Multiplayer or Singleplayer mode
 import * as events from '../core/events.js';
-import { pollWhileVisible } from '../core/util.js';
+import { pollUntilDone } from '../core/util.js';
 
 let currentMode = null;
 
+// Polls until we know the mode, then sleeps. Page events restart polling so a
+// runtime mode switch (e.g. user toggles SP/MP) is picked up promptly.
+const modePoller = pollUntilDone(() => {
+    detectMode();
+    return currentMode ? false : true;
+}, 1000);
+
 export function initModeDetector() {
-    pollWhileVisible(detectMode, 1000);
+    events.on('page', () => {
+        // A page event might be from a mode toggle — re-detect to confirm.
+        modePoller.start();
+    });
 }
 
 export function getMode() {

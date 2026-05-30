@@ -2,7 +2,7 @@
 import * as events from '../core/events.js';
 import * as storage from '../core/storage.js';
 import * as settings from '../core/settings.js';
-import { pollWhileVisible } from '../core/util.js';
+import { pollUntilDone } from '../core/util.js';
 import { getMode } from '../game/mode.js';
 import { getDiscordUser, isLinked, openOAuth, unlinkDiscord, setTimer } from '../features/discord.js';
 import { openCombatSimPage } from './combatSimPage.js';
@@ -137,10 +137,16 @@ function applyRecipeClickthrough() {
 
 const GAME_PAGES = 'skill-page, equipment-page, home-page, market-page, merchant-page, settings-page, taming-page, profile-page, quests-page, guild-page, adventure-page, challenges-page, leaderboards-page, upgrade-page, traits-page, mastery-page, marks-page, store-page, daily-quest-page, changelog-page';
 
+// Self-stopping poller for the nav button. Polls until the button is in the
+// DOM, then sleeps. Page changes re-arm it in case Angular tore the button out.
+const navBtnPoller = pollUntilDone(() => {
+    injectNavButton();
+    return document.getElementById(MENU_ID) ? false : true;
+}, 1000);
+
 export function initMenu() {
     migrateUISettings();
     applyUIChanges();
-    pollWhileVisible(injectNavButton, 1000);
 
     // Re-apply UI changes once game mode is detected (settings may have been
     // saved under a mode-scoped key before this fix)
@@ -150,6 +156,9 @@ export function initMenu() {
     });
 
     events.on('page', (page) => {
+        // Re-arm nav button polling in case Angular removed our button on
+        // navigation. The poller self-stops as soon as the button is back.
+        if (!document.getElementById(MENU_ID)) navBtnPoller.start();
         // Navigated away — clean up our page (same as Pancake's handlePage)
         if (page.type !== 'riftscript') {
             $(PAGE_TAG).remove();

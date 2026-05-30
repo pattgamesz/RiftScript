@@ -1,7 +1,7 @@
 // Full Combat Simulator page for RiftScript
 import * as events from '../core/events.js';
 import * as storage from '../core/storage.js';
-import { formatNumber, secondsToDuration, expToLevel, levelToExp } from '../core/util.js';
+import { formatNumber, secondsToDuration, expToLevel, levelToExp, pollUntilDone } from '../core/util.js';
 import { simulate, calculateResults } from '../features/combatCalc.js';
 import {
     calculateEfficiency, calculateXpModifiers, calculateLootModifiers,
@@ -80,9 +80,14 @@ const BREW_TYPES = [
     { name: "Regular Brew", type: "xp",   cost: 500, effect: 15 },
     { name: "Basic Brew",   type: "xp",   cost: 200, effect: 8 },
 ];
+const navBtnPoller = pollUntilDone(() => {
+    injectNavButton();
+    return document.getElementById(NAV_ID) ? false : true;
+}, 1000);
 export function initCombatSimPage() {
-    setInterval(injectNavButton, 1000);
     events.on("page", (page) => {
+      // Re-arm nav button polling if Angular tore our button out on navigation.
+      if (!document.getElementById(NAV_ID)) navBtnPoller.start();
       if (page.type !== "combatsim") {
         $(PAGE_TAG).remove();
         $(`#${NAV_ID}`).removeClass("rs-nav-active");
