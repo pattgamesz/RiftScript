@@ -339,7 +339,14 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.5.7 — Pet chip layout polish + 4-passive breeding banner</div>
+                                <div class="rs-changelog-section">v1.5.8 — Craft target button + script load polish</div>
+                                <ul>
+                                    <li><b>Target button on crafting modals</b> — same idea as the market Target button: type a desired total quantity, click Target, and the input drops to exactly what you still need to craft (target − owned). Native game styling via button clone. Toggle in Settings → Skills (default on).</li>
+                                    <li><b>Smoother under the hood</b> — debounced the pet modal scanner so Angular's frequent re-renders no longer trigger 50+ DOM scans per second; debounced the post-modal re-render so rapid pet clicks no longer stack up full panel rebuilds; the market filter no longer clears your live search on sub-tab clicks.</li>
+                                    <li><b>Self-stopping pollers</b> — nav button injection, mode detection and the pet panel re-injection loop now stop the moment their work is done (and re-arm on page change), so the script sips CPU instead of ticking forever in the background. Polling also pauses on hidden tabs.</li>
+                                    <li><b>Load-failure toast</b> — if game data or auth token isn't available 15–30s after startup, a bottom-right toast appears with a Refresh button. No more silently broken script after a slow page load.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.5.7 — Pet chip layout polish + 4-passive breeding banner</div>
                                 <ul>
                                     <li><b>Stable passive chip order</b> — every pet's chip row now reads the same way: Melee Block → Ranged Evade → Magic Resist → Loot Find → Egg Find → Health / Attack / Defense → Hunger last. No more shuffling between pets.</li>
                                     <li><b>Single-ability pets line up too</b> — pets with only one ability get an invisible spacer chip in the second slot, so H/A/D and passive columns are aligned across every row.</li>
