@@ -703,6 +703,10 @@ function renderSettingsCard() {
             ${setting('market-target-amount', 'Target amount', 'Adds a Target button on Buy/Order modals — fills only what you need to reach a desired total.', true)}
         </div>
         <div class="rs-card">
+            <div class="rs-card-header">Skills</div>
+            ${setting('craft-target-amount', 'Craft target amount', 'Adds a Target button on the Craft modal — fills only what you need to craft to reach a desired total.', true)}
+        </div>
+        <div class="rs-card">
             <div class="rs-card-header">Pets</div>
             <div class="rs-row">
                 <span style="font-size:0.78em;color:rgba(255,255,255,0.5);line-height:1.4">

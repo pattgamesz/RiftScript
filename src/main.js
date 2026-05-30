@@ -12,6 +12,7 @@ import { initMarketCompetition } from './features/marketCompetition.js';
 import { initMarketPriceButtons } from './features/marketPriceButtons.js';
 import { initMarketListingLimit } from './features/marketListingLimit.js';
 import { initTargetAmountMarket } from './features/targetAmountMarket.js';
+import { initTargetAmountCrafting } from './features/targetAmountCrafting.js';
 import { initIdleBeep } from './features/idleBeep.js';
 import { initLoadHealthCheck } from './features/loadHealthCheck.js';
 import { initPetReader } from './game/petReader.js';
@@ -49,6 +50,7 @@ import { initStyles } from './ui/styles.js';
     initMarketPriceButtons();
     initMarketListingLimit();
     initTargetAmountMarket();
+    initTargetAmountCrafting();
     initIdleBeep();
     initPetFilter();
 
