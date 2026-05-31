@@ -106,6 +106,11 @@ const CSS = `
     color: rgba(255,255,255,0.4);
     font-weight: 400;
 }
+/* Per-row cost line on consumed items — slightly brighter so the cost
+ * stands out next to the muted stored/lasts info. */
+.rs-extra.rs-cost {
+    color: rgba(248, 113, 113, 0.85);
+}
 
 /* Bottleneck ingredient — the consumable that will run out first. Subtle
  * red tint + left-border so it stands out without screaming. */

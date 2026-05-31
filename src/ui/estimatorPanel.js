@@ -391,6 +391,9 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
             ? ` <span class="rs-tome-tag">ON</span>`
             : ` <span class="rs-tome-tag rs-tome-tag-off">OFF</span>`;
     }
+    const goldLine = goldPerHour > 0
+        ? `<span class="rs-extra rs-cost">- ${formatNumber(goldPerHour)} gold / hr</span>`
+        : '';
     return `
         <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">
             ${image ? `<img class="rs-item-img" src="${image}" />` : ''}
@@ -398,6 +401,7 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
             <span class="rs-mid"><input type="number" class="rs-price-input" data-item="${d.itemId}" value="${Math.round(price)}" min="0" /></span>
             <span class="rs-value rs-item-value">
                 <span>${perHourLine}</span>
+                ${goldLine}
                 <span class="rs-extra">${formatNumber(d.stored)} stored</span>
                 <span class="rs-extra">${lastsLine}</span>
             </span>
