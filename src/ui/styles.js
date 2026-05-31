@@ -147,6 +147,23 @@ const CSS = `
     vertical-align: middle;
     white-space: nowrap;
 }
+.rs-tome-select-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    line-height: 1;
+}
+/* Tiny indicator above the tier select so the dropdown's "T8" has context
+ * without needing a hover/tooltip. Deliberately barely-there. */
+.rs-tome-pick-label {
+    font-size: 0.55em;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-bottom: 1px;
+}
 .rs-tome-select {
     background: rgba(0,0,0,0.3);
     color: #fff;

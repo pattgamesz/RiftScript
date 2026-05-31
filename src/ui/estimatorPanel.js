@@ -382,7 +382,9 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
         }
         // Group dropdown + state tag in an inline-flex unit so they wrap as a
         // single block (not each on its own line) if the panel is narrow.
-        nameSuffix = `<span class="rs-tome-pick"><select class="rs-tome-select">${opts}</select>${state}</span>`;
+        // The "Insatiable" label sits directly above the dropdown so the
+        // tier number has context without needing a tooltip.
+        nameSuffix = `<span class="rs-tome-pick"><span class="rs-tome-select-wrap"><span class="rs-tome-pick-label">Insatiable</span><select class="rs-tome-select">${opts}</select></span>${state}</span>`;
     }
     // Mastery Contract — show an On/Off pill so the player can see whether
     // the consumption rate / cost shown in this row is being applied.
