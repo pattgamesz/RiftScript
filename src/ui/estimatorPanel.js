@@ -1,9 +1,11 @@
 // Renders the estimator panel into the game UI
 import * as events from '../core/events.js';
 import * as storage from '../core/storage.js';
+import * as settings from '../core/settings.js';
 import { formatNumber, secondsToDuration } from '../core/util.js';
 import { calcGoalTime } from '../features/estimator.js';
 import { isLinked, setTimer } from '../features/discord.js';
+import { getInsatiableTomeLevel } from '../features/tomeDetector.js';
 import { data } from '../game/data.js';
 
 const PANEL_ID = 'riftscript-estimator';
@@ -345,10 +347,25 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
     const lastsLine = Number.isFinite(d.secondsLeft) && d.secondsLeft > 0
         ? `lasts ${secondsToDuration(d.secondsLeft)}`
         : '&nbsp;';
+    // For food items (HEAL attr) show whether the Insatiable Power Tome
+    // is currently driving the consumption rate, so the player knows the
+    // 'lasts X' figure is using the tome's drain without needing to open
+    // Settings.
+    const heal = data.items?.byId?.[d.itemId]?.attributes?.HEAL;
+    let nameSuffix = '';
+    if (heal) {
+        const tomeLvl = getInsatiableTomeLevel();
+        const tomeActive = !!settings.get('insatiable-tome-active');
+        if (tomeLvl > 0 && tomeActive) {
+            nameSuffix = ` <span class="rs-tome-tag">T${tomeLvl} tome · ${(tomeLvl * 0.2).toFixed(1)} HP/s</span>`;
+        } else if (tomeLvl > 0) {
+            nameSuffix = ` <span class="rs-tome-tag rs-tome-tag-off">T${tomeLvl} tome off</span>`;
+        }
+    }
     return `
         <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">
             ${image ? `<img class="rs-item-img" src="${image}" />` : ''}
-            <span class="rs-label">${name}</span>
+            <span class="rs-label">${name}${nameSuffix}</span>
             <span class="rs-mid"><input type="number" class="rs-price-input" data-item="${d.itemId}" value="${Math.round(price)}" min="0" /></span>
             <span class="rs-value rs-item-value">
                 <span>${perHourLine}</span>

@@ -113,6 +113,25 @@ const CSS = `
     background: rgba(239, 68, 68, 0.08);
     box-shadow: inset 3px 0 0 #ef4444;
 }
+/* Small inline tag next to food row names showing the Insatiable Power Tome
+ * level + HP/s. Gold when the toggle is on (the rate is being used);
+ * neutral grey with 'off' label when detected but the toggle is off. */
+.rs-tome-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 0.7em;
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    border-radius: 3px;
+    letter-spacing: 0.2px;
+    font-weight: 600;
+}
+.rs-tome-tag-off {
+    color: rgba(255,255,255,0.4);
+    border-color: rgba(255,255,255,0.2);
+}
+
 /* Section headers */
 .rs-section-header {
     padding: 8px 12px 4px;

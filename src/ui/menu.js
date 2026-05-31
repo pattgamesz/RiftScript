@@ -4,6 +4,7 @@ import * as storage from '../core/storage.js';
 import * as settings from '../core/settings.js';
 import { pollUntilDone } from '../core/util.js';
 import { getMode } from '../game/mode.js';
+import { getInsatiableTomeLevel } from '../features/tomeDetector.js';
 import { getDiscordUser, isLinked, openOAuth, unlinkDiscord, setTimer } from '../features/discord.js';
 import { openCombatSimPage } from './combatSimPage.js';
 
@@ -615,9 +616,6 @@ function renderPage() {
         settings.set(key, $(this).is(':checked'));
     });
 
-    page.find('.rs-insatiable-hps').on('change', function() {
-        settings.set('insatiable-hps', +$(this).val() || 0);
-    });
 
     page.find('#rs-discord-link').on('click', () => openOAuth());
     page.find('#rs-discord-unlink').on('click', () => {
@@ -716,13 +714,28 @@ function renderSettingsCard() {
         <div class="rs-card">
             <div class="rs-card-header">Skills</div>
             ${setting('craft-target-amount', 'Craft target amount', 'Adds a Target button on the Craft modal — fills only what you need to craft to reach a desired total.', true)}
-            <div class="rs-row rs-setting-row">
-                <div class="rs-setting-info">
-                    <span>Insatiable Power Tome HP/s</span>
-                    <span class="rs-setting-desc">If you have the tome equipped, enter its HP/s drain (e.g. 1.6 for T8). Used to compute food-lasts on every skill, not just combat. 0 = disabled.</span>
-                </div>
-                <input type="number" class="rs-input-sm rs-insatiable-hps" min="0" step="0.1" value="${settings.get('insatiable-hps') || 0}" style="width:60px">
-            </div>
+            ${(() => {
+                const lvl = getInsatiableTomeLevel();
+                const label = lvl > 0
+                    ? `Insatiable Power Tome (T${lvl} — ${(lvl * 0.2).toFixed(1)} HP/s)`
+                    : 'Insatiable Power Tome (not detected yet)';
+                const desc = lvl > 0
+                    ? `Apply the tome's HP/s food drain to every skill's food bottleneck calc, not just combat. Auto-detected once per fresh install; T8 = max, never re-queried.`
+                    : 'Tome not detected yet — reload the page if you just installed RiftScript or equipped the tome for the first time.';
+                const checked = !!settings.get('insatiable-tome-active');
+                return `
+                    <div class="rs-row rs-setting-row">
+                        <div class="rs-setting-info">
+                            <span>${label}</span>
+                            <span class="rs-setting-desc">${desc}</span>
+                        </div>
+                        <label class="rs-toggle">
+                            <input type="checkbox" class="rs-feature-toggle" data-key="insatiable-tome-active" ${checked ? 'checked' : ''} ${lvl ? '' : 'disabled'}>
+                            <span class="rs-toggle-slider"></span>
+                        </label>
+                    </div>
+                `;
+            })()}
         </div>
         <div class="rs-card">
             <div class="rs-card-header">Pets</div>
