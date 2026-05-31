@@ -1,16 +1,12 @@
-// Detects the player's Insatiable Power Tome level once per page load and
-// caches it in localStorage. Tome level caps at 8 — once we've recorded that,
-// we never hit the API again.
+// Detects the player's Insatiable Power Tome level once per page load via
+// the getUser API and caches it in localStorage. Tome level caps at 8 —
+// once we've recorded that, we never hit the API again.
 //
 // Used by the estimator to model the tome's HP/s food drain on every skill
 // (not just combat). Linear formula: level × 0.2 HP/s. T8 = 1.6, T1 = 0.2.
-//
-// Detection order: API (getUser) → DOM fallback (Equipment → Tomes tab).
-// API is preferred because it works regardless of which page the user opens.
 import { api } from '../core/api.js';
 import { hasAuth } from '../core/auth.js';
 import { data } from '../game/data.js';
-import * as events from '../core/events.js';
 
 const STORAGE_KEY = 'riftscript_insatiable_tome_v1';
 const MAX_LEVEL = 8;
@@ -45,6 +41,17 @@ export function getInsatiableHps() {
     return getInsatiableTomeLevel() * 0.2;
 }
 
+// Manual override from the Settings dropdown. 0 clears the cache.
+export function setInsatiableTomeLevel(level) {
+    level = Math.max(0, Math.min(MAX_LEVEL, +level || 0));
+    cachedLevel = level;
+    if (level === 0) {
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    } else {
+        saveCache(level);
+    }
+}
+
 // Wait until either auth+data are both ready, or we've hit `maxSeconds`.
 async function waitForReady(maxSeconds = 60) {
     for (let i = 0; i < maxSeconds; i++) {
@@ -56,14 +63,6 @@ async function waitForReady(maxSeconds = 60) {
 
 export async function initTomeDetector() {
     loadCache();
-    // DOM fallback whenever the user lands on a page that might surface tomes.
-    // Cheap to run, fires only if cachedLevel < MAX.
-    events.on('page', () => {
-        if (cachedLevel === MAX_LEVEL) return;
-        // defer one tick so Angular has rendered
-        setTimeout(tryDetectFromDom, 500);
-    });
-
     if (cachedLevel === MAX_LEVEL) {
         console.log(`[RiftScript] Insatiable Tome: T${MAX_LEVEL} cached (max), skipping fetch`);
         return;
@@ -73,7 +72,7 @@ export async function initTomeDetector() {
 
     const ready = await waitForReady();
     if (!ready) {
-        console.warn('[RiftScript] Insatiable Tome: auth/data not ready after 60s, skipping API detection');
+        console.warn('[RiftScript] Insatiable Tome: auth/data not ready after 60s, skipping');
         return;
     }
 
@@ -81,13 +80,13 @@ export async function initTomeDetector() {
         const resp = await api.getUser();
         const level = findInsatiableTomeLevel(resp);
         if (level > 0) {
-            console.log(`[RiftScript] Insatiable Tome detected via API: T${level} (${(level * 0.2).toFixed(1)} HP/s)`);
+            console.log(`[RiftScript] Insatiable Tome detected: T${level} (${(level * 0.2).toFixed(1)} HP/s)`);
             if (level !== cachedLevel) {
                 cachedLevel = level;
                 saveCache(level);
             }
         } else {
-            console.log('[RiftScript] Insatiable Tome: not found in getUser. Open the Equipment → Tomes tab once to detect via DOM.');
+            console.log('[RiftScript] Insatiable Tome not detected via getUser — set the level manually in Settings if you have one.');
         }
     } catch (e) {
         console.warn('[RiftScript] Insatiable Tome: getUser failed —', e.message);
@@ -129,23 +128,3 @@ function collectIds(node, out) {
     }
 }
 
-// Fallback: scan the visible DOM for any "Insatiable Power Tome N" text.
-// Triggered on every page change — catches the Equipment → Tomes tab, item
-// tooltips, market listings, anywhere the name shows up.
-export function tryDetectFromDom() {
-    if (cachedLevel === MAX_LEVEL) return;
-    if (!data.items) return;
-    const body = document.body?.innerText || '';
-    const re = /Insatiable Power Tome\s+(\d+)/g;
-    let best = cachedLevel || 0;
-    let m;
-    while ((m = re.exec(body)) !== null) {
-        const level = +m[1];
-        if (level > best) best = level;
-    }
-    if (best > (cachedLevel || 0)) {
-        console.log(`[RiftScript] Insatiable Tome detected via DOM: T${best} (${(best * 0.2).toFixed(1)} HP/s)`);
-        cachedLevel = best;
-        saveCache(best);
-    }
-}

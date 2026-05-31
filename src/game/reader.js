@@ -43,58 +43,34 @@ function readActionConsumables() {
         .find('.row')
         .each((_i, el) => {
             const $el = $(el);
-            const fullText = $el.text();
-            // Skip empty slots. Don't rely on \b word boundaries — Angular
-            // sometimes concatenates "NameEmpty" without a space.
+            const fullText = $el.text() || '';
+            // Slot toggle states the player has explicitly disabled / left empty.
             if (/Empty/i.test(fullText)) return;
 
-            // Resolve the item via image (preferred — unambiguous) or name.
+            // Resolve item via image (unambiguous) or name lookup.
             const src = $el.find('img').first().attr('src') || '';
             const filename = src.split('/').pop();
             let item = data.items.byImage[filename];
             if (!item) {
-                // .name element text. Strip a trailing number + anything after
-                // (the stored count is sometimes inside the same span).
-                const nameText = $el.find('.name').first().text() || '';
-                const cleanName = nameText.replace(/\s*\d[\d,]*.*$/, '').trim();
-                item = data.items.byName[cleanName];
-                // Fallback: scan the whole row text for a known consumable
-                // item name. Handles weird DOM shapes where the name lives
-                // in something other than .name, or where the image src
-                // doesn't match any indexed image.
-                if (!item) item = findItemByTextScan(fullText);
+                const nameText = ($el.find('.name').first().text() || '')
+                    .replace(/\s*\d[\d,]*.*$/, '').trim();
+                item = data.items.byName[nameText];
             }
-            if (!item) {
-                logConsumableMiss($el, fullText);
-                return;
-            }
+            if (!item) return;
 
-            const stored = findConsumableStored(fullText);
-            if (stored > 0) consumables[item.id] = stored;
+            // Try .amount first (cleanest source), then fall back to scanning
+            // the row text for the largest plain number that isn't a unit
+            // suffix (%, HP, hr, gold, sec, min).
+            const amountText = ($el.find('.amount').first().text() || '').trim();
+            let stored = parseNumber(amountText) || 0;
+            if (!stored) stored = findConsumableStored(fullText);
+
+            // Emit even with stored=0 so the row appears in the UI. The
+            // estimator will render '0 stored' for genuinely empty slots and
+            // the real count when it's been parsed correctly.
+            consumables[item.id] = stored;
         });
     events.emit('action-consumables', consumables);
-}
-
-// Scan the row text for any indexed consumable name (HEAL / DURATION items).
-// Last-resort match when image and .name lookups both fail.
-function findItemByTextScan(text) {
-    for (const item of data.items.list) {
-        const a = item.attributes;
-        if (!a) continue;
-        if (!a.HEAL && !a.DURATION) continue;
-        if (!item.name) continue;
-        if (text.includes(item.name)) return item;
-    }
-    return null;
-}
-
-const _logged = new Set();
-function logConsumableMiss($el, text) {
-    const key = ($el.find('.name').first().text() || text || '').slice(0, 40);
-    if (_logged.has(key)) return;
-    _logged.add(key);
-    const src = $el.find('img').first().attr('src') || '(no image)';
-    console.warn('[RiftScript] Consumable row not matched — name="' + key + '" img="' + src + '"');
 }
 
 // Pick the largest plain number in the row's text that isn't followed by a

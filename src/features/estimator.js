@@ -120,34 +120,35 @@ function calculate(skillId, actionId) {
     const effectiveHpPerHour = (skill.type === 'Combat' ? damagePerHour : 0) + insatiableHpPerHour;
     for (const [itemIdStr, count] of Object.entries(consumables)) {
         const itemId = +itemIdStr;
-        if (!count) continue;
         const item = data.items.byId[itemId];
         if (!item) continue;
         const duration = item.attributes?.DURATION;
         const heal = item.attributes?.HEAL;
+        if (!duration && !heal) continue; // not a tracked consumable type
         let perHour = 0;
         let secondsLeft = Infinity;
-        if (duration) {
-            perHour = 3600 / duration;
-            secondsLeft = count * duration;
-        } else if (heal) {
-            // Prefer the game's own Food/hr if it's reporting one.
-            // Otherwise derive from effective HP drain (monster damage on
-            // combat + Insatiable tome on every skill) divided by the
-            // food's heal value. Non-combat with no tome → 0 → no lasts.
-            perHour = foodPerHour > 0
-                ? foodPerHour
-                : (effectiveHpPerHour > 0 ? effectiveHpPerHour / heal : 0);
-            secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
-        } else {
-            continue; // not a tracked consumable type
+        if (count > 0) {
+            if (duration) {
+                perHour = 3600 / duration;
+                secondsLeft = count * duration;
+            } else if (heal) {
+                // Prefer the game's own Food/hr if it's reporting one.
+                // Otherwise derive from effective HP drain (monster damage on
+                // combat + Insatiable tome on every skill) divided by the
+                // food's heal value. Non-combat with no tome → 0 → no lasts.
+                perHour = foodPerHour > 0
+                    ? foodPerHour
+                    : (effectiveHpPerHour > 0 ? effectiveHpPerHour / heal : 0);
+                secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
+            }
         }
         const sellPrice = item.attributes?.MIN_MARKET_PRICE || item.attributes?.SELL_PRICE || 0;
         ingredientDetails.push({
             itemId, stored: count, perHour, secondsLeft, sellPrice,
             goldPerHour: perHour * sellPrice,
         });
-        if (secondsLeft < finishedSeconds) {
+        // Only consider as bottleneck when there's actually stock to run out.
+        if (count > 0 && secondsLeft < finishedSeconds) {
             finishedSeconds = secondsLeft;
             bottleneck = { itemId, secondsLeft };
         }

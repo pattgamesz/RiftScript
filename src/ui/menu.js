@@ -4,7 +4,7 @@ import * as storage from '../core/storage.js';
 import * as settings from '../core/settings.js';
 import { pollUntilDone } from '../core/util.js';
 import { getMode } from '../game/mode.js';
-import { getInsatiableTomeLevel } from '../features/tomeDetector.js';
+import { getInsatiableTomeLevel, setInsatiableTomeLevel } from '../features/tomeDetector.js';
 import { getDiscordUser, isLinked, openOAuth, unlinkDiscord, setTimer } from '../features/discord.js';
 import { openCombatSimPage } from './combatSimPage.js';
 
@@ -616,6 +616,11 @@ function renderPage() {
         settings.set(key, $(this).is(':checked'));
     });
 
+    page.find('.rs-tome-level-select').on('change', function() {
+        setInsatiableTomeLevel(+$(this).val() || 0);
+        renderPage();
+    });
+
 
     page.find('#rs-discord-link').on('click', () => openOAuth());
     page.find('#rs-discord-unlink').on('click', () => {
@@ -716,23 +721,27 @@ function renderSettingsCard() {
             ${setting('craft-target-amount', 'Craft target amount', 'Adds a Target button on the Craft modal — fills only what you need to craft to reach a desired total.', true)}
             ${(() => {
                 const lvl = getInsatiableTomeLevel();
+                const checked = !!settings.get('insatiable-tome-active');
                 const label = lvl > 0
                     ? `Insatiable Power Tome (T${lvl} — ${(lvl * 0.2).toFixed(1)} HP/s)`
-                    : 'Insatiable Power Tome (not detected yet)';
-                const desc = lvl > 0
-                    ? `Apply the tome's HP/s food drain to every skill's food bottleneck calc, not just combat. Auto-detected once per fresh install; T8 = max, never re-queried.`
-                    : 'Tome not detected yet — reload the page if you just installed RiftScript or equipped the tome for the first time.';
-                const checked = !!settings.get('insatiable-tome-active');
+                    : 'Insatiable Power Tome';
+                const desc = `Adds the tome's HP/s food drain (level × 0.2) to every skill's food bottleneck calc — not just combat. Auto-detect via getUser; if that misses, pick your tier manually below.`;
+                const opts = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+                    .map(n => `<option value="${n}" ${n === lvl ? 'selected' : ''}>${n === 0 ? 'None' : `T${n}`}</option>`)
+                    .join('');
                 return `
                     <div class="rs-row rs-setting-row">
                         <div class="rs-setting-info">
                             <span>${label}</span>
                             <span class="rs-setting-desc">${desc}</span>
                         </div>
-                        <label class="rs-toggle">
-                            <input type="checkbox" class="rs-feature-toggle" data-key="insatiable-tome-active" ${checked ? 'checked' : ''} ${lvl ? '' : 'disabled'}>
-                            <span class="rs-toggle-slider"></span>
-                        </label>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <select class="rs-tome-level-select" style="background:rgba(0,0,0,0.3);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 6px;font-size:0.85em">${opts}</select>
+                            <label class="rs-toggle">
+                                <input type="checkbox" class="rs-feature-toggle" data-key="insatiable-tome-active" ${checked ? 'checked' : ''} ${lvl ? '' : 'disabled'}>
+                                <span class="rs-toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
                 `;
             })()}
