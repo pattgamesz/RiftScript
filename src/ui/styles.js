@@ -131,17 +131,28 @@ const CSS = `
     color: rgba(255,255,255,0.4);
     border-color: rgba(255,255,255,0.2);
 }
-/* Inline tome tier picker on food rows — compact, fits next to item name. */
-.rs-tome-select {
+/* Inline tome tier picker on food rows — dropdown + state tag grouped so
+ * they stay on the same line as the item name and wrap as a unit when
+ * space is tight. */
+.rs-tome-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     margin-left: 6px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.rs-tome-select {
     background: rgba(0,0,0,0.3);
     color: #fff;
     border: 1px solid rgba(255,255,255,0.2);
     border-radius: 3px;
-    padding: 1px 4px;
-    font-size: 0.75em;
+    padding: 1px 3px;
+    font-size: 0.7em;
     font-weight: 600;
     cursor: pointer;
+    height: 18px;
+    line-height: 1;
 }
 .rs-tome-select:hover {
     border-color: rgba(251, 191, 36, 0.5);

@@ -365,15 +365,17 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
         const tomeLvl = getInsatiableTomeLevel();
         const tomeActive = !!settings.get('insatiable-tome-active');
         const opts = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-            .map(n => `<option value="${n}" ${n === tomeLvl ? 'selected' : ''}>${n === 0 ? 'No tome' : `T${n}`}</option>`)
+            .map(n => `<option value="${n}" ${n === tomeLvl ? 'selected' : ''}>${n === 0 ? '—' : `T${n}`}</option>`)
             .join('');
         let state = '';
         if (tomeLvl > 0) {
             state = tomeActive
-                ? ` <span class="rs-tome-tag">${(tomeLvl * 0.2).toFixed(1)} HP/s</span>`
-                : ` <span class="rs-tome-tag rs-tome-tag-off">disabled</span>`;
+                ? `<span class="rs-tome-tag">${(tomeLvl * 0.2).toFixed(1)} HP/s</span>`
+                : `<span class="rs-tome-tag rs-tome-tag-off">disabled</span>`;
         }
-        nameSuffix = ` <select class="rs-tome-select">${opts}</select>${state}`;
+        // Group dropdown + state tag in an inline-flex unit so they wrap as a
+        // single block (not each on its own line) if the panel is narrow.
+        nameSuffix = `<span class="rs-tome-pick"><select class="rs-tome-select">${opts}</select>${state}</span>`;
     }
     return `
         <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">
