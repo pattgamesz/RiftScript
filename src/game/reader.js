@@ -53,16 +53,48 @@ function readActionConsumables() {
             const filename = src.split('/').pop();
             let item = data.items.byImage[filename];
             if (!item) {
+                // .name element text. Strip a trailing number + anything after
+                // (the stored count is sometimes inside the same span).
                 const nameText = $el.find('.name').first().text() || '';
-                const cleanName = nameText.replace(/[\d,]+.*$/, '').trim();
+                const cleanName = nameText.replace(/\s*\d[\d,]*.*$/, '').trim();
                 item = data.items.byName[cleanName];
+                // Fallback: scan the whole row text for a known consumable
+                // item name. Handles weird DOM shapes where the name lives
+                // in something other than .name, or where the image src
+                // doesn't match any indexed image.
+                if (!item) item = findItemByTextScan(fullText);
             }
-            if (!item) return;
+            if (!item) {
+                logConsumableMiss($el, fullText);
+                return;
+            }
 
             const stored = findConsumableStored(fullText);
             if (stored > 0) consumables[item.id] = stored;
         });
     events.emit('action-consumables', consumables);
+}
+
+// Scan the row text for any indexed consumable name (HEAL / DURATION items).
+// Last-resort match when image and .name lookups both fail.
+function findItemByTextScan(text) {
+    for (const item of data.items.list) {
+        const a = item.attributes;
+        if (!a) continue;
+        if (!a.HEAL && !a.DURATION) continue;
+        if (!item.name) continue;
+        if (text.includes(item.name)) return item;
+    }
+    return null;
+}
+
+const _logged = new Set();
+function logConsumableMiss($el, text) {
+    const key = ($el.find('.name').first().text() || text || '').slice(0, 40);
+    if (_logged.has(key)) return;
+    _logged.add(key);
+    const src = $el.find('img').first().attr('src') || '(no image)';
+    console.warn('[RiftScript] Consumable row not matched — name="' + key + '" img="' + src + '"');
 }
 
 // Pick the largest plain number in the row's text that isn't followed by a

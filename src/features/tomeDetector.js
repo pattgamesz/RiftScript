@@ -1,12 +1,16 @@
-// Detects the player's Insatiable Power Tome level once per session (or first
-// run after a fresh install) and caches it in localStorage. Tome level caps
-// at 8 — once we've recorded that, we never hit the API again.
+// Detects the player's Insatiable Power Tome level once per page load and
+// caches it in localStorage. Tome level caps at 8 — once we've recorded that,
+// we never hit the API again.
 //
 // Used by the estimator to model the tome's HP/s food drain on every skill
 // (not just combat). Linear formula: level × 0.2 HP/s. T8 = 1.6, T1 = 0.2.
+//
+// Detection order: API (getUser) → DOM fallback (Equipment → Tomes tab).
+// API is preferred because it works regardless of which page the user opens.
 import { api } from '../core/api.js';
 import { hasAuth } from '../core/auth.js';
 import { data } from '../game/data.js';
+import * as events from '../core/events.js';
 
 const STORAGE_KEY = 'riftscript_insatiable_tome_v1';
 const MAX_LEVEL = 8;
@@ -41,21 +45,53 @@ export function getInsatiableHps() {
     return getInsatiableTomeLevel() * 0.2;
 }
 
+// Wait until either auth+data are both ready, or we've hit `maxSeconds`.
+async function waitForReady(maxSeconds = 60) {
+    for (let i = 0; i < maxSeconds; i++) {
+        if (hasAuth() && data.items) return true;
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    return false;
+}
+
 export async function initTomeDetector() {
     loadCache();
-    // Already at max — tome can't level up, never re-fetch.
-    if (cachedLevel === MAX_LEVEL) return;
+    // DOM fallback whenever the user lands on a page that might surface tomes.
+    // Cheap to run, fires only if cachedLevel < MAX.
+    events.on('page', () => {
+        if (cachedLevel === MAX_LEVEL) return;
+        // defer one tick so Angular has rendered
+        setTimeout(tryDetectFromDom, 500);
+    });
+
+    if (cachedLevel === MAX_LEVEL) {
+        console.log(`[RiftScript] Insatiable Tome: T${MAX_LEVEL} cached (max), skipping fetch`);
+        return;
+    }
     if (attempted) return;
     attempted = true;
-    if (!hasAuth() || !data.items) return;
+
+    const ready = await waitForReady();
+    if (!ready) {
+        console.warn('[RiftScript] Insatiable Tome: auth/data not ready after 60s, skipping API detection');
+        return;
+    }
+
     try {
         const resp = await api.getUser();
         const level = findInsatiableTomeLevel(resp);
-        if (level > 0 && level !== cachedLevel) {
-            cachedLevel = level;
-            saveCache(level);
+        if (level > 0) {
+            console.log(`[RiftScript] Insatiable Tome detected via API: T${level} (${(level * 0.2).toFixed(1)} HP/s)`);
+            if (level !== cachedLevel) {
+                cachedLevel = level;
+                saveCache(level);
+            }
+        } else {
+            console.log('[RiftScript] Insatiable Tome: not found in getUser. Open the Equipment → Tomes tab once to detect via DOM.');
         }
-    } catch (e) { /* swallow */ }
+    } catch (e) {
+        console.warn('[RiftScript] Insatiable Tome: getUser failed —', e.message);
+    }
 }
 
 // Walk the getUser response recursively, collect every id-looking field,
@@ -90,5 +126,26 @@ function collectIds(node, out) {
         } else {
             collectIds(v, out);
         }
+    }
+}
+
+// Fallback: scan the visible DOM for any "Insatiable Power Tome N" text.
+// Triggered on every page change — catches the Equipment → Tomes tab, item
+// tooltips, market listings, anywhere the name shows up.
+export function tryDetectFromDom() {
+    if (cachedLevel === MAX_LEVEL) return;
+    if (!data.items) return;
+    const body = document.body?.innerText || '';
+    const re = /Insatiable Power Tome\s+(\d+)/g;
+    let best = cachedLevel || 0;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+        const level = +m[1];
+        if (level > best) best = level;
+    }
+    if (best > (cachedLevel || 0)) {
+        console.log(`[RiftScript] Insatiable Tome detected via DOM: T${best} (${(best * 0.2).toFixed(1)} HP/s)`);
+        cachedLevel = best;
+        saveCache(best);
     }
 }
