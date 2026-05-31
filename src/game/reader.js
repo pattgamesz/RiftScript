@@ -22,11 +22,27 @@ function readAll() {
         readActionExp(page.skill);
         readActionInventory();
         readActionLoot();
+        readActionConsumables();
         readActionEstimates(page.skill);
         readSetAmount(page.skill);
         const isActive = $skill.find('.action-stop').length > 0;
         events.emit('action-active', isActive);
     }
+}
+
+// Read the Consumables card on a skill-page — covers food, sigils, potions,
+// brews, anything the game lists with a stored count. Empty slots are skipped.
+function readActionConsumables() {
+    const consumables = {};
+    $('skill-page .header > .name:contains("Consumables")')
+        .closest('.card')
+        .find('.row')
+        .each((_i, el) => {
+            const $el = $(el);
+            if (/\bEmpty\b/i.test($el.text())) return;
+            extractItem($el, consumables);
+        });
+    events.emit('action-consumables', consumables);
 }
 
 // Read all skill levels from the left sidebar (always visible)
