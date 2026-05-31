@@ -1,5 +1,6 @@
 // Estimator — reads game estimates, calculates time to level, profit, etc.
 import * as events from '../core/events.js';
+import * as settings from '../core/settings.js';
 import { data } from '../game/data.js';
 import * as util from '../core/util.js';
 
@@ -102,11 +103,18 @@ function calculate(skillId, actionId) {
     // Read straight from the in-game Consumables card on the skill page.
     // Items split by attribute:
     //   - DURATION (sigil / potion / brew, typically 180s = 20/hr)
-    //   - HEAL on a combat skill = food, consumed at damagePerHour/heal
+    //   - HEAL = food. Combat: consumed at damage rate. With Insatiable
+    //     Power Tome equipped, an extra HP/s is drained on every action
+    //     regardless of skill — config'd as 'insatiable-hps' (default 0,
+    //     user enters their tome's rate, e.g. 1.6 for T8).
     // The shortest-lasting one wins the bottleneck tag.
     const consumables = events.last('action-consumables') || {};
     const damagePerHour = hasGameData ? (gameEst.damagePerHour || 0) : 0;
     const foodPerHour = hasGameData ? (gameEst.foodPerHour || 0) : 0;
+    const insatiableHps = +settings.get('insatiable-hps') || 0;
+    // Combat takes monster damage + insatiable; other skills only insatiable.
+    const insatiableHpPerHour = insatiableHps * 3600;
+    const effectiveHpPerHour = (skill.type === 'Combat' ? damagePerHour : 0) + insatiableHpPerHour;
     for (const [itemIdStr, count] of Object.entries(consumables)) {
         const itemId = +itemIdStr;
         if (!count) continue;
@@ -120,17 +128,14 @@ function calculate(skillId, actionId) {
             perHour = 3600 / duration;
             secondsLeft = count * duration;
         } else if (heal) {
-            // Food. On combat skills we have a real consumption rate; on
-            // other skills we just show the stock with no "lasts X" line.
-            if (skill.type === 'Combat') {
-                perHour = foodPerHour > 0
-                    ? foodPerHour
-                    : (damagePerHour > 0 ? damagePerHour / heal : 0);
-                secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
-            } else {
-                perHour = 0;
-                secondsLeft = Infinity;
-            }
+            // Prefer the game's own Food/hr if it's reporting one.
+            // Otherwise derive from effective HP drain (monster damage on
+            // combat + Insatiable tome on every skill) divided by the
+            // food's heal value. Non-combat with no tome → 0 → no lasts.
+            perHour = foodPerHour > 0
+                ? foodPerHour
+                : (effectiveHpPerHour > 0 ? effectiveHpPerHour / heal : 0);
+            secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
         } else {
             continue; // not a tracked consumable type
         }

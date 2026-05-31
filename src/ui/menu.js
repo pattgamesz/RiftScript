@@ -615,6 +615,10 @@ function renderPage() {
         settings.set(key, $(this).is(':checked'));
     });
 
+    page.find('.rs-insatiable-hps').on('change', function() {
+        settings.set('insatiable-hps', +$(this).val() || 0);
+    });
+
     page.find('#rs-discord-link').on('click', () => openOAuth());
     page.find('#rs-discord-unlink').on('click', () => {
         unlinkDiscord();
@@ -712,6 +716,13 @@ function renderSettingsCard() {
         <div class="rs-card">
             <div class="rs-card-header">Skills</div>
             ${setting('craft-target-amount', 'Craft target amount', 'Adds a Target button on the Craft modal — fills only what you need to craft to reach a desired total.', true)}
+            <div class="rs-row rs-setting-row">
+                <div class="rs-setting-info">
+                    <span>Insatiable Power Tome HP/s</span>
+                    <span class="rs-setting-desc">If you have the tome equipped, enter its HP/s drain (e.g. 1.6 for T8). Used to compute food-lasts on every skill, not just combat. 0 = disabled.</span>
+                </div>
+                <input type="number" class="rs-input-sm rs-insatiable-hps" min="0" step="0.1" value="${settings.get('insatiable-hps') || 0}" style="width:60px">
+            </div>
         </div>
         <div class="rs-card">
             <div class="rs-card-header">Pets</div>
