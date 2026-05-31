@@ -717,7 +717,7 @@ function renderSettingsCard() {
             ${setting('craft-target-amount', 'Craft target amount', 'Adds a Target button on the Craft modal — fills only what you need to craft to reach a desired total.', true)}
             ${(() => {
                 const lvl = getInsatiableTomeLevel();
-                const checked = !!settings.get('insatiable-tome-active');
+                const checked = settings.getOnDefault('insatiable-tome-active');
                 const label = lvl > 0
                     ? `Insatiable Power Tome (T${lvl} — ${(lvl * 0.2).toFixed(1)} HP/s)`
                     : 'Insatiable Power Tome';
@@ -729,7 +729,7 @@ function renderSettingsCard() {
                             <span class="rs-setting-desc">${desc}</span>
                         </div>
                         <label class="rs-toggle">
-                            <input type="checkbox" class="rs-feature-toggle" data-key="insatiable-tome-active" ${checked ? 'checked' : ''} ${lvl ? '' : 'disabled'}>
+                            <input type="checkbox" class="rs-feature-toggle" data-key="insatiable-tome-active" ${checked ? 'checked' : ''}>
                             <span class="rs-toggle-slider"></span>
                         </label>
                     </div>

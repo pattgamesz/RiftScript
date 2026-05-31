@@ -114,7 +114,7 @@ function calculate(skillId, actionId) {
     const foodPerHour = hasGameData ? (gameEst.foodPerHour || 0) : 0;
     // Insatiable Power Tome HP/s drain. Auto-detected level × 0.2 (linear),
     // only applied when the user has flipped the toggle on.
-    const insatiableHps = settings.get('insatiable-tome-active') ? getInsatiableHps() : 0;
+    const insatiableHps = settings.getOnDefault('insatiable-tome-active') ? getInsatiableHps() : 0;
     // Combat takes monster damage + insatiable; other skills only insatiable.
     const insatiableHpPerHour = insatiableHps * 3600;
     const effectiveHpPerHour = (skill.type === 'Combat' ? damagePerHour : 0) + insatiableHpPerHour;

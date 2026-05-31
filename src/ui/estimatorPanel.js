@@ -271,8 +271,12 @@ function updateValues(est) {
         p.find('[data-field="lootGoalRow"]').hide();
     }
 
-    // Items tab — only rebuild if not focused on a price input
-    if (!p.find('.rs-price-input:focus').length) {
+    // Items tab — only rebuild if no interactive control is active. The
+    // poll-driven estimation event fires up to once per second, and any
+    // rebuild while the user is editing a price OR has the tome dropdown
+    // open destroys their interaction (some browsers close the native
+    // <select> overlay the moment its DOM node is replaced).
+    if (!p.find('.rs-price-input:focus, .rs-tome-select:focus').length) {
         let dropGold = 0;
         let ingGold = 0;
 
@@ -370,7 +374,7 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
     let nameSuffix = '';
     if (heal) {
         const tomeLvl = getInsatiableTomeLevel();
-        const tomeActive = !!settings.get('insatiable-tome-active');
+        const tomeActive = settings.getOnDefault('insatiable-tome-active');
         const opts = [0, 1, 2, 3, 4, 5, 6, 7, 8]
             .map(n => `<option value="${n}" ${n === tomeLvl ? 'selected' : ''}>${n === 0 ? '—' : `T${n}`}</option>`)
             .join('');
