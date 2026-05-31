@@ -119,13 +119,18 @@ function calculate(skillId, actionId) {
         if (duration) {
             perHour = 3600 / duration;
             secondsLeft = count * duration;
-        } else if (heal && skill.type === 'Combat') {
-            // Food consumption rate: prefer game's reported food/hour, fall
-            // back to derived damagePerHour / heal.
-            perHour = foodPerHour > 0
-                ? foodPerHour
-                : (damagePerHour > 0 ? damagePerHour / heal : 0);
-            secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
+        } else if (heal) {
+            // Food. On combat skills we have a real consumption rate; on
+            // other skills we just show the stock with no "lasts X" line.
+            if (skill.type === 'Combat') {
+                perHour = foodPerHour > 0
+                    ? foodPerHour
+                    : (damagePerHour > 0 ? damagePerHour / heal : 0);
+                secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
+            } else {
+                perHour = 0;
+                secondsLeft = Infinity;
+            }
         } else {
             continue; // not a tracked consumable type
         }

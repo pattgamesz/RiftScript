@@ -32,6 +32,10 @@ function readAll() {
 
 // Read the Consumables card on a skill-page — covers food, sigils, potions,
 // brews, anything the game lists with a stored count. Empty slots are skipped.
+// The default extractItem helper reads .amount/.value which on this card
+// holds the effect (e.g. "240 HP", "22%"), not the stored count — so we
+// extract the count separately by scanning the row for plain numbers that
+// aren't followed by a unit suffix.
 function readActionConsumables() {
     const consumables = {};
     $('skill-page .header > .name:contains("Consumables")')
@@ -39,10 +43,42 @@ function readActionConsumables() {
         .find('.row')
         .each((_i, el) => {
             const $el = $(el);
-            if (/\bEmpty\b/i.test($el.text())) return;
-            extractItem($el, consumables);
+            const fullText = $el.text();
+            // Skip empty slots. Don't rely on \b word boundaries — Angular
+            // sometimes concatenates "NameEmpty" without a space.
+            if (/Empty/i.test(fullText)) return;
+
+            // Resolve the item via image (preferred — unambiguous) or name.
+            const src = $el.find('img').first().attr('src') || '';
+            const filename = src.split('/').pop();
+            let item = data.items.byImage[filename];
+            if (!item) {
+                const nameText = $el.find('.name').first().text() || '';
+                const cleanName = nameText.replace(/[\d,]+.*$/, '').trim();
+                item = data.items.byName[cleanName];
+            }
+            if (!item) return;
+
+            const stored = findConsumableStored(fullText);
+            if (stored > 0) consumables[item.id] = stored;
         });
     events.emit('action-consumables', consumables);
+}
+
+// Pick the largest plain number in the row's text that isn't followed by a
+// unit suffix (% / HP / hr / gold / sec). On a Consumables row that's the
+// stored count; effect values are excluded by the unit-suffix filter.
+function findConsumableStored(text) {
+    const numberRe = /\d[\d,]*/g;
+    let best = 0;
+    let m;
+    while ((m = numberRe.exec(text)) !== null) {
+        const after = text.slice(m.index + m[0].length, m.index + m[0].length + 5);
+        if (/^(%|\s*HP|\s*hr|\s*gold|\s*sec|\s*min)/i.test(after)) continue;
+        const n = parseNumber(m[0]);
+        if (n > best) best = n;
+    }
+    return best;
 }
 
 // Read all skill levels from the left sidebar (always visible)

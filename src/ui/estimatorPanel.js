@@ -335,20 +335,25 @@ function itemRow(itemId, perHour, price, goldPerHour) {
 function ingredientRow(d, price, goldPerHour, isBottleneck) {
     const name = getItemName(d.itemId);
     const image = getItemImage(d.itemId);
-    // Stored count + how long it lasts at the current rate. The bottleneck
-    // (item that runs out first) gets a red outline so the player spots it
-    // before starting a long craft session.
-    const durationText = Number.isFinite(d.secondsLeft)
-        ? `${formatNumber(d.stored)} stored · lasts ${secondsToDuration(d.secondsLeft)}`
-        : `${formatNumber(d.stored)} stored`;
+    // Row gets a red tint if it's the bottleneck (no extra tag — the color
+    // is the signal). Two fixed extra lines under the perHour value so
+    // every row aligns: stored count, then "lasts X" (or omitted when we
+    // don't know the consumption rate, e.g. food on a non-combat skill).
+    const perHourLine = d.perHour > 0
+        ? `${formatNumber(d.perHour)} / hr`
+        : '&nbsp;';
+    const lastsLine = Number.isFinite(d.secondsLeft) && d.secondsLeft > 0
+        ? `lasts ${secondsToDuration(d.secondsLeft)}`
+        : '&nbsp;';
     return `
         <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">
             ${image ? `<img class="rs-item-img" src="${image}" />` : ''}
-            <span class="rs-label">${name}${isBottleneck ? ' <span class="rs-bottleneck-tag">runs out first</span>' : ''}</span>
+            <span class="rs-label">${name}</span>
             <span class="rs-mid"><input type="number" class="rs-price-input" data-item="${d.itemId}" value="${Math.round(price)}" min="0" /></span>
             <span class="rs-value rs-item-value">
-                <span>${formatNumber(d.perHour)} / hr</span>
-                <span class="rs-extra">${durationText}</span>
+                <span>${perHourLine}</span>
+                <span class="rs-extra">${formatNumber(d.stored)} stored</span>
+                <span class="rs-extra">${lastsLine}</span>
             </span>
         </div>
     `;
