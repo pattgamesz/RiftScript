@@ -118,19 +118,58 @@ function calculate(skillId, actionId) {
     // Combat takes monster damage + insatiable; other skills only insatiable.
     const insatiableHpPerHour = insatiableHps * 3600;
     const effectiveHpPerHour = (skill.type === 'Combat' ? damagePerHour : 0) + insatiableHpPerHour;
-    for (const [itemIdStr, count] of Object.entries(consumables)) {
-        const itemId = +itemIdStr;
-        const item = data.items.byId[itemId];
+    // Find the main produced drop (used for the Mastery Contract cost calc).
+    const producedDrops = drops.filter(d => d.type !== 'FAILED' && d.type !== 'MONSTER');
+    const mainDrop = producedDrops.length
+        ? producedDrops.reduce((best, d) =>
+            (d.chance * (1 + d.amount)) > (best.chance * (1 + best.amount)) ? d : best
+        )
+        : null;
+    const mainDropItem = mainDrop ? data.items.byId[mainDrop.item] : null;
+    const mainDropPrice = mainDropItem
+        ? (mainDropItem.attributes?.MIN_MARKET_PRICE || mainDropItem.attributes?.SELL_PRICE || 0)
+        : 0;
+
+    for (const [key, raw] of Object.entries(consumables)) {
+        // Unpack — values can be a plain number (count) or an object with
+        // extra metadata (Mastery Contract emits { count, active }).
+        const count = typeof raw === 'object' ? raw.count : raw;
+        const meta  = typeof raw === 'object' ? raw : {};
+
+        // Resolve the item. 'brew' is synthetic — we treat it as a 180s
+        // sigil-class item with its own image, since it isn't in the DB.
+        const isBrew = key === 'brew';
+        const item = isBrew
+            ? { id: 'brew', name: 'Brew', image: 'misc/brew.png', attributes: { DURATION: 180 } }
+            : data.items.byId[+key];
         if (!item) continue;
+
         const duration = item.attributes?.DURATION;
         const heal = item.attributes?.HEAL;
-        if (!duration && !heal) continue; // not a tracked consumable type
+        const isContract = item.id === 1041;
+        if (!duration && !heal && !isContract) continue;
+
         let perHour = 0;
         let secondsLeft = Infinity;
+        let sellPrice = item.attributes?.MIN_MARKET_PRICE || item.attributes?.SELL_PRICE || 0;
+        let goldPerHour = 0;
+
         if (count > 0) {
-            if (duration) {
+            if (isContract) {
+                if (meta.active && actionsPerHour > 0) {
+                    perHour = actionsPerHour;
+                    secondsLeft = (count / actionsPerHour) * 3600;
+                    // Cost = market price of the main produced item (the
+                    // contract creates + contributes one to mastery per
+                    // action, so the displayed loss equals that item's
+                    // market value, not the contract's own price).
+                    sellPrice = mainDropPrice;
+                    goldPerHour = perHour * sellPrice;
+                }
+            } else if (duration) {
                 perHour = 3600 / duration;
                 secondsLeft = count * duration;
+                goldPerHour = perHour * sellPrice;
             } else if (heal) {
                 // Prefer the game's own Food/hr if it's reporting one.
                 // Otherwise derive from effective HP drain (monster damage on
@@ -140,17 +179,21 @@ function calculate(skillId, actionId) {
                     ? foodPerHour
                     : (effectiveHpPerHour > 0 ? effectiveHpPerHour / heal : 0);
                 secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
+                goldPerHour = perHour * sellPrice;
             }
         }
-        const sellPrice = item.attributes?.MIN_MARKET_PRICE || item.attributes?.SELL_PRICE || 0;
+
         ingredientDetails.push({
-            itemId, stored: count, perHour, secondsLeft, sellPrice,
-            goldPerHour: perHour * sellPrice,
+            itemId: isBrew ? 'brew' : item.id,
+            stored: count,
+            perHour, secondsLeft, sellPrice, goldPerHour,
+            synthetic: isBrew ? { name: 'Brew', image: 'misc/brew.png' } : null,
+            contract: isContract ? { active: !!meta.active } : null,
         });
         // Only consider as bottleneck when there's actually stock to run out.
         if (count > 0 && secondsLeft < finishedSeconds) {
             finishedSeconds = secondsLeft;
-            bottleneck = { itemId, secondsLeft };
+            bottleneck = { itemId: isBrew ? 'brew' : item.id, secondsLeft };
         }
     }
 

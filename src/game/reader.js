@@ -47,10 +47,18 @@ function readActionConsumables() {
             // Slot toggle states the player has explicitly disabled / left empty.
             if (/Empty/i.test(fullText)) return;
 
-            // Resolve item via image (unambiguous) or name lookup.
             const src = $el.find('img').first().attr('src') || '';
-            const filename = src.split('/').pop();
+            const filename = src.split('/').pop() || '';
             let item = data.items.byImage[filename];
+
+            // Brew isn't in our items DB — synthesize an entry keyed by 'brew'
+            // and let the estimator treat it as a 180s sigil-class consumable.
+            // Match anywhere in the filename so tiered brew variants are caught.
+            if (!item && /brew/i.test(filename)) {
+                const stored = readStored($el, fullText);
+                if (stored > 0) consumables['brew'] = stored;
+                return;
+            }
             if (!item) {
                 const nameText = ($el.find('.name').first().text() || '')
                     .replace(/\s*\d[\d,]*.*$/, '').trim();
@@ -58,19 +66,28 @@ function readActionConsumables() {
             }
             if (!item) return;
 
-            // Try .amount first (cleanest source), then fall back to scanning
-            // the row text for the largest plain number that isn't a unit
-            // suffix (%, HP, hr, gold, sec, min).
-            const amountText = ($el.find('.amount').first().text() || '').trim();
-            let stored = parseNumber(amountText) || 0;
-            if (!stored) stored = findConsumableStored(fullText);
+            const stored = readStored($el, fullText);
 
-            // Emit even with stored=0 so the row appears in the UI. The
-            // estimator will render '0 stored' for genuinely empty slots and
-            // the real count when it's been parsed correctly.
+            // Mastery Contract — consumes 1 per action when toggled On. The
+            // row text contains "On" / "Off" matching the toggle state, so
+            // detect it from the trailing label.
+            if (item.id === 1041) {
+                const active = !/(^|[\s ])Off([\s ]|$)/i.test(fullText);
+                consumables[item.id] = { count: stored, active };
+                return;
+            }
+
+            // Emit even with stored=0 so the row appears in the UI.
             consumables[item.id] = stored;
         });
     events.emit('action-consumables', consumables);
+}
+
+function readStored($el, fullText) {
+    const amountText = ($el.find('.amount').first().text() || '').trim();
+    let stored = parseNumber(amountText) || 0;
+    if (!stored) stored = findConsumableStored(fullText);
+    return stored;
 }
 
 // Pick the largest plain number in the row's text that isn't followed by a

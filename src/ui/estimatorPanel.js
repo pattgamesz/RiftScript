@@ -46,8 +46,9 @@ function saveCustomPrice(itemId, price) {
     storage.save('custom-prices', customPrices);
 }
 
-function getPrice(itemId) {
+function getPrice(itemId, fallback) {
     if (customPrices[itemId] !== undefined) return customPrices[itemId];
+    if (fallback != null) return fallback;
     const item = data.items?.byId[itemId];
     return item?.attributes?.MIN_MARKET_PRICE || item?.attributes?.SELL_PRICE || 0;
 }
@@ -61,11 +62,13 @@ export function initEstimatorPanel() {
     });
 }
 
-function getItemName(itemId) {
+function getItemName(itemId, synthetic) {
+    if (synthetic?.name) return synthetic.name;
     return data.items?.byId[itemId]?.name || `Item ${itemId}`;
 }
 
-function getItemImage(itemId) {
+function getItemImage(itemId, synthetic) {
+    if (synthetic?.image) return `/assets/${synthetic.image}`;
     const item = data.items?.byId[itemId];
     return item ? `/assets/${item.image}` : '';
 }
@@ -287,7 +290,11 @@ function updateValues(est) {
             itemsHtml += '<div class="rs-section-header">Consumed</div>';
             const bottleneckId = est.bottleneck?.itemId;
             itemsHtml += est.ingredients.map(d => {
-                const price = getPrice(d.itemId);
+                // Use the estimator-provided sellPrice as the default — covers
+                // synthetic items (brew has no DB entry) and the Mastery
+                // Contract row, whose 'cost per unit' is the produced item's
+                // market price, not the contract's own.
+                const price = getPrice(d.itemId, d.sellPrice);
                 const gold = d.perHour * price;
                 ingGold += gold;
                 return ingredientRow(d, price, gold, bottleneckId === d.itemId);
@@ -342,8 +349,8 @@ function itemRow(itemId, perHour, price, goldPerHour) {
 }
 
 function ingredientRow(d, price, goldPerHour, isBottleneck) {
-    const name = getItemName(d.itemId);
-    const image = getItemImage(d.itemId);
+    const name = getItemName(d.itemId, d.synthetic);
+    const image = getItemImage(d.itemId, d.synthetic);
     // Row gets a red tint if it's the bottleneck (no extra tag — the color
     // is the signal). Two fixed extra lines under the perHour value so
     // every row aligns: stored count, then "lasts X" (or omitted when we
@@ -376,6 +383,13 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
         // Group dropdown + state tag in an inline-flex unit so they wrap as a
         // single block (not each on its own line) if the panel is narrow.
         nameSuffix = `<span class="rs-tome-pick"><select class="rs-tome-select">${opts}</select>${state}</span>`;
+    }
+    // Mastery Contract — show an On/Off pill so the player can see whether
+    // the consumption rate / cost shown in this row is being applied.
+    if (d.contract) {
+        nameSuffix = d.contract.active
+            ? ` <span class="rs-tome-tag">ON</span>`
+            : ` <span class="rs-tome-tag rs-tome-tag-off">OFF</span>`;
     }
     return `
         <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">
