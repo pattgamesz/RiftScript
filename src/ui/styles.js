@@ -107,6 +107,25 @@ const CSS = `
     font-weight: 400;
 }
 
+/* Bottleneck ingredient — the consumable that will run out first. Subtle
+ * red tint + left-border so it stands out without screaming. */
+.rs-bottleneck {
+    background: rgba(239, 68, 68, 0.08);
+    box-shadow: inset 3px 0 0 #ef4444;
+}
+.rs-bottleneck-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 0.7em;
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+}
+
 /* Section headers */
 .rs-section-header {
     padding: 8px 12px 4px;

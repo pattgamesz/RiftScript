@@ -66,6 +66,7 @@ function calculate(skillId, actionId) {
     const ingredientDetails = [];
     let finishedSeconds = Infinity;
     let ingredientGoldPerHour = 0;
+    let bottleneck = null;
     for (const ing of ingredients) {
         const perHour = ing.amount * actionsPerHour;
         const stored = inventory[ing.item] || 0;
@@ -75,7 +76,15 @@ function calculate(skillId, actionId) {
         const goldPerHour = perHour * sellPrice;
         ingredientGoldPerHour += goldPerHour;
         ingredientDetails.push({ itemId: ing.item, stored, perHour, secondsLeft, sellPrice, goldPerHour });
-        if (secondsLeft < finishedSeconds) finishedSeconds = secondsLeft;
+        if (secondsLeft < finishedSeconds) {
+            finishedSeconds = secondsLeft;
+            // Track which ingredient is the bottleneck — first to run out.
+            // Only meaningful when secondsLeft is finite (i.e. stored > 0 OR
+            // we actually use this ingredient at all).
+            if (Number.isFinite(secondsLeft)) {
+                bottleneck = { itemId: ing.item, secondsLeft };
+            }
+        }
     }
 
     // --- Set amount limit ---
@@ -126,6 +135,7 @@ function calculate(skillId, actionId) {
         tierUpActions: actionsPerHour > 0 ? Math.ceil(tierUpSeconds / 3600 * actionsPerHour) : 0,
         isActive: !!events.last('action-active'),
         finishedSeconds,
+        bottleneck,
         ingredients: ingredientDetails,
         drops: dropDetails,
         loot,

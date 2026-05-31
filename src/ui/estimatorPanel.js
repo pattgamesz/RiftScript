@@ -194,7 +194,18 @@ function updateValues(est) {
 
     // Overview
     p.find('[data-field="xpPerHour"]').text(formatNumber(est.xpPerHour));
-    p.find('[data-field="finished"]').text(est.isActive ? secondsToDuration(est.finishedSeconds) : 'Not active');
+    // Finished row also names the bottleneck ingredient (the one that runs out
+    // first) so the player can spot what they need to top up.
+    if (est.isActive) {
+        let finishedHtml = secondsToDuration(est.finishedSeconds);
+        if (est.bottleneck) {
+            const name = getItemName(est.bottleneck.itemId);
+            finishedHtml += `<span class="rs-extra">${name} runs out first</span>`;
+        }
+        p.find('[data-field="finished"]').html(finishedHtml);
+    } else {
+        p.find('[data-field="finished"]').text('Not active');
+    }
 
     if (est.levelUpSeconds > 0) {
         p.find('[data-field="levelRow"]').show();
@@ -266,11 +277,12 @@ function updateValues(est) {
         }
         if (est.ingredients.length) {
             itemsHtml += '<div class="rs-section-header">Consumed</div>';
+            const bottleneckId = est.bottleneck?.itemId;
             itemsHtml += est.ingredients.map(d => {
                 const price = getPrice(d.itemId);
                 const gold = d.perHour * price;
                 ingGold += gold;
-                return itemRow(d.itemId, d.perHour, price, gold);
+                return ingredientRow(d, price, gold, bottleneckId === d.itemId);
             }).join('');
         }
 
@@ -309,6 +321,28 @@ function itemRow(itemId, perHour, price, goldPerHour) {
             <span class="rs-value rs-item-value">
                 <span>${formatNumber(perHour)} / hr</span>
                 <span class="rs-extra">${formatNumber(goldPerHour)} gold / hr</span>
+            </span>
+        </div>
+    `;
+}
+
+function ingredientRow(d, price, goldPerHour, isBottleneck) {
+    const name = getItemName(d.itemId);
+    const image = getItemImage(d.itemId);
+    // Stored count + how long it lasts at the current rate. The bottleneck
+    // (item that runs out first) gets a red outline so the player spots it
+    // before starting a long craft session.
+    const durationText = Number.isFinite(d.secondsLeft)
+        ? `${formatNumber(d.stored)} stored · lasts ${secondsToDuration(d.secondsLeft)}`
+        : `${formatNumber(d.stored)} stored`;
+    return `
+        <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">
+            ${image ? `<img class="rs-item-img" src="${image}" />` : ''}
+            <span class="rs-label">${name}${isBottleneck ? ' <span class="rs-bottleneck-tag">runs out first</span>' : ''}</span>
+            <span class="rs-mid"><input type="number" class="rs-price-input" data-item="${d.itemId}" value="${Math.round(price)}" min="0" /></span>
+            <span class="rs-value rs-item-value">
+                <span>${formatNumber(d.perHour)} / hr</span>
+                <span class="rs-extra">${durationText}</span>
             </span>
         </div>
     `;
