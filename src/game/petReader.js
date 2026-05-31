@@ -5,8 +5,7 @@ import * as events from '../core/events.js';
 import { parseNumber, debounce } from '../core/util.js';
 import { data } from './data.js';
 import { setPetStats } from '../core/petStats.js';
-import { api } from '../core/api.js';
-import { hasAuth } from '../core/auth.js';
+import { getUser } from '../core/userCache.js';
 
 let inProgress = false;
 let modalObserver = null;
@@ -32,12 +31,6 @@ function saveKnownTeamNames() {
         localStorage.setItem(TEAM_NAMES_KEY, JSON.stringify([...knownTeamNames]));
     } catch (e) { /* quota */ }
 }
-
-// getUser cache — contains the player's pets with unique IDs + stats
-let userCache = null;
-let userCacheTime = 0;
-let userInFlight = null;
-const USER_TTL_MS = 60_000;
 
 export function initPetReader() {
     loadKnownTeamNames();
@@ -66,23 +59,9 @@ export function trigger() {
 }
 
 async function getApiPets() {
-    if (!hasAuth()) return null;
-    const now = Date.now();
-    if (userCache && now - userCacheTime < USER_TTL_MS) return userCache;
-    if (userInFlight) return userInFlight;
-    userInFlight = (async () => {
-        try {
-            const resp = await api.getUser();
-            userCache = extractPetsFromUser(resp);
-            userCacheTime = now;
-            return userCache;
-        } catch (e) {
-            return userCache;
-        } finally {
-            userInFlight = null;
-        }
-    })();
-    return userInFlight;
+    const resp = await getUser();
+    if (!resp) return null;
+    return extractPetsFromUser(resp);
 }
 
 function extractPetsFromUser(resp) {

@@ -5,7 +5,7 @@ import * as settings from '../core/settings.js';
 import { formatNumber, secondsToDuration } from '../core/util.js';
 import { calcGoalTime } from '../features/estimator.js';
 import { isLinked, setTimer } from '../features/discord.js';
-import { getInsatiableTomeLevel } from '../features/tomeDetector.js';
+import { getInsatiableTomeLevel, setInsatiableTomeLevel } from '../features/tomeDetector.js';
 import { data } from '../game/data.js';
 
 const PANEL_ID = 'riftscript-estimator';
@@ -314,6 +314,13 @@ function updateValues(est) {
         }).on('keydown', function(e) {
             if (e.key === 'Enter') $(this).blur();
         });
+
+        // Bind tome tier dropdown — sets the level globally + re-renders so
+        // the state tag and food calc update without a page reload.
+        p.find('.rs-tome-select').on('change', function() {
+            setInsatiableTomeLevel(+$(this).val() || 0);
+            updateValues(events.last('estimation'));
+        });
     }
 
 }
@@ -347,20 +354,26 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
     const lastsLine = Number.isFinite(d.secondsLeft) && d.secondsLeft > 0
         ? `lasts ${secondsToDuration(d.secondsLeft)}`
         : '&nbsp;';
-    // For food items (HEAL attr) show whether the Insatiable Power Tome
-    // is currently driving the consumption rate, so the player knows the
-    // 'lasts X' figure is using the tome's drain without needing to open
-    // Settings.
+    // For food items (HEAL attr) show an inline Insatiable Power Tome tier
+    // picker so the player can set it without opening Settings. Right next
+    // to the dropdown we render the current HP/s drain (when the toggle is
+    // on) or 'disabled' (when it's off in Settings) so the row makes its
+    // own state visible.
     const heal = data.items?.byId?.[d.itemId]?.attributes?.HEAL;
     let nameSuffix = '';
     if (heal) {
         const tomeLvl = getInsatiableTomeLevel();
         const tomeActive = !!settings.get('insatiable-tome-active');
-        if (tomeLvl > 0 && tomeActive) {
-            nameSuffix = ` <span class="rs-tome-tag">T${tomeLvl} tome · ${(tomeLvl * 0.2).toFixed(1)} HP/s</span>`;
-        } else if (tomeLvl > 0) {
-            nameSuffix = ` <span class="rs-tome-tag rs-tome-tag-off">T${tomeLvl} tome off</span>`;
+        const opts = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+            .map(n => `<option value="${n}" ${n === tomeLvl ? 'selected' : ''}>${n === 0 ? 'No tome' : `T${n}`}</option>`)
+            .join('');
+        let state = '';
+        if (tomeLvl > 0) {
+            state = tomeActive
+                ? ` <span class="rs-tome-tag">${(tomeLvl * 0.2).toFixed(1)} HP/s</span>`
+                : ` <span class="rs-tome-tag rs-tome-tag-off">disabled</span>`;
         }
+        nameSuffix = ` <select class="rs-tome-select">${opts}</select>${state}`;
     }
     return `
         <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">

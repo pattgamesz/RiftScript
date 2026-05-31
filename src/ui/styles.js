@@ -131,6 +131,21 @@ const CSS = `
     color: rgba(255,255,255,0.4);
     border-color: rgba(255,255,255,0.2);
 }
+/* Inline tome tier picker on food rows — compact, fits next to item name. */
+.rs-tome-select {
+    margin-left: 6px;
+    background: rgba(0,0,0,0.3);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-size: 0.75em;
+    font-weight: 600;
+    cursor: pointer;
+}
+.rs-tome-select:hover {
+    border-color: rgba(251, 191, 36, 0.5);
+}
 
 /* Section headers */
 .rs-section-header {

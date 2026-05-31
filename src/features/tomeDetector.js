@@ -4,8 +4,7 @@
 //
 // Used by the estimator to model the tome's HP/s food drain on every skill
 // (not just combat). Linear formula: level × 0.2 HP/s. T8 = 1.6, T1 = 0.2.
-import { api } from '../core/api.js';
-import { hasAuth } from '../core/auth.js';
+import { getUser } from '../core/userCache.js';
 import { data } from '../game/data.js';
 
 const STORAGE_KEY = 'riftscript_insatiable_tome_v1';
@@ -52,15 +51,6 @@ export function setInsatiableTomeLevel(level) {
     }
 }
 
-// Wait until either auth+data are both ready, or we've hit `maxSeconds`.
-async function waitForReady(maxSeconds = 60) {
-    for (let i = 0; i < maxSeconds; i++) {
-        if (hasAuth() && data.items) return true;
-        await new Promise(r => setTimeout(r, 1000));
-    }
-    return false;
-}
-
 export async function initTomeDetector() {
     loadCache();
     if (cachedLevel === MAX_LEVEL) {
@@ -70,26 +60,28 @@ export async function initTomeDetector() {
     if (attempted) return;
     attempted = true;
 
-    const ready = await waitForReady();
-    if (!ready) {
-        console.warn('[RiftScript] Insatiable Tome: auth/data not ready after 60s, skipping');
+    // Wait for data.items so we can map IDs → item names.
+    for (let i = 0; i < 60; i++) {
+        if (data.items) break;
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    if (!data.items) return;
+
+    const resp = await getUser();
+    if (!resp) {
+        console.log('[RiftScript] Insatiable Tome: no user data available yet (will retry on demand)');
+        attempted = false; // allow another try later
         return;
     }
-
-    try {
-        const resp = await api.getUser();
-        const level = findInsatiableTomeLevel(resp);
-        if (level > 0) {
-            console.log(`[RiftScript] Insatiable Tome detected: T${level} (${(level * 0.2).toFixed(1)} HP/s)`);
-            if (level !== cachedLevel) {
-                cachedLevel = level;
-                saveCache(level);
-            }
-        } else {
-            console.log('[RiftScript] Insatiable Tome not detected via getUser — set the level manually in Settings if you have one.');
+    const level = findInsatiableTomeLevel(resp);
+    if (level > 0) {
+        console.log(`[RiftScript] Insatiable Tome detected: T${level} (${(level * 0.2).toFixed(1)} HP/s)`);
+        if (level !== cachedLevel) {
+            cachedLevel = level;
+            saveCache(level);
         }
-    } catch (e) {
-        console.warn('[RiftScript] Insatiable Tome: getUser failed —', e.message);
+    } else {
+        console.log('[RiftScript] Insatiable Tome not found in user data — set the tier inline on the Items tab if you have one.');
     }
 }
 

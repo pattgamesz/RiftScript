@@ -2,8 +2,7 @@
 import * as storage from '../core/storage.js';
 import { formatNumber } from '../core/util.js';
 import { simulate, calculateResults } from '../features/combatCalc.js';
-import { api } from '../core/api.js';
-import { hasAuth } from '../core/auth.js';
+import { getUser } from '../core/userCache.js';
 import { data } from '../game/data.js';
 import { getMode } from '../game/mode.js';
 
@@ -342,22 +341,21 @@ export function bindCombatEvents(page) {
     // Recalculate on any input change
     page.find('.rs-combat-input').on('input change', () => recalculate(page));
 
-    // Auto-fetch stats when opening the tab
-    if (hasAuth()) {
-        (async () => {
-            try {
-                const userData = await api.getUser();
-                if (applyUserStats(page, userData)) {
-                    saveConfig(getConfig(page));
-                    recalculate(page);
-                }
-            } catch (e) {
-                page.find('#rs-cb-alert')
-                    .text('Could not fetch your game stats. Try refreshing the page.')
-                    .show();
-            }
-        })();
-    }
+    // Auto-fetch stats when opening the tab (served from the shared cache;
+    // refetches only when the cache is older than the TTL).
+    (async () => {
+        const userData = await getUser();
+        if (!userData) {
+            page.find('#rs-cb-alert')
+                .text('Could not fetch your game stats. Try refreshing the page.')
+                .show();
+            return;
+        }
+        if (applyUserStats(page, userData)) {
+            saveConfig(getConfig(page));
+            recalculate(page);
+        }
+    })();
 
     // Initial calculation
     recalculate(page);

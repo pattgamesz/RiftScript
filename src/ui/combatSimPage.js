@@ -9,8 +9,7 @@ import {
     calculateAdventureProfit,
     TIER_OPTIONS, SIGIL_OPTIONS, MAP_MOD_OPTIONS, ADVENTURE_PROFIT_ITEMS,
 } from '../features/modifiers.js';
-import { api } from '../core/api.js';
-import { hasAuth } from '../core/auth.js';
+import { getUser } from '../core/userCache.js';
 import { data } from '../game/data.js';
 import { getMode } from '../game/mode.js';
 
@@ -1072,9 +1071,7 @@ function renderPage() {
     loadEquipmentConfig();
     renderEquipmentSlots(page);
     renderMonsterList(page);
-    if (hasAuth()) {
-      fetchStats(page);
-    }
+    fetchStats(page);
   }
 function controlInput(label, id, value, step = 1, suffix = "") {
     return `
@@ -1229,7 +1226,8 @@ function getRarityLabel(chance) {
   }
 async function fetchStats(page) {
     try {
-      const userData = await api.getUser();
+      const userData = await getUser();
+      if (!userData) return;
       fetchedUserData = userData;
       const history2 = userData?.user?.action?.history;
       populateEquipmentFromUser(userData);

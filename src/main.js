@@ -1,5 +1,6 @@
 // RiftScript — Ironwood RPG enhancement scripts by Patt
 import { initAuthInterceptor } from './core/auth.js';
+import { primeUserCache } from './core/userCache.js';
 import { loadGameData } from './game/data.js';
 import { initPageDetector } from './game/page.js';
 import { initReaders } from './game/reader.js';
@@ -37,6 +38,11 @@ import { initStyles } from './ui/styles.js';
         initAuthInterceptor(),
         loadGameData(),
     ]);
+
+    // Fire-and-forget: warm the shared userCache so features that need it
+    // (tome detector, combat panel, pet reader, combat sim) don't each pay
+    // the latency of a first fetch.
+    primeUserCache();
 
     initReaders();
     initMarketReader();
