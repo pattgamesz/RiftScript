@@ -93,6 +93,39 @@ function calculate(skillId, actionId) {
         const setAmountSeconds = (setAmountData.remaining / actionsPerHour) * 3600;
         if (setAmountSeconds < finishedSeconds) {
             finishedSeconds = setAmountSeconds;
+            bottleneck = null; // set-amount, not an ingredient
+        }
+    }
+
+    // --- Combat food bottleneck ---
+    // Combat actions don't list ingredients, but they consume food when HP
+    // drops. Find every HEAL-attribute item in inventory and estimate how
+    // long that buffer lasts at the current damage-taken rate. Treat it as
+    // a synthetic ingredient for the bottleneck calc + UI.
+    if (skill.type === 'Combat') {
+        const damagePerHour = hasGameData ? gameEst.damagePerHour : 0;
+        const foodPerHour = hasGameData ? gameEst.foodPerHour : 0;
+        for (const [itemIdStr, count] of Object.entries(inventory)) {
+            const itemId = +itemIdStr;
+            const item = data.items.byId[itemId];
+            const heal = item?.attributes?.HEAL;
+            if (!heal || !count) continue;
+            // Prefer game's reported food/hour; fall back to derived
+            // damagePerHour / heal if the game shows damage but not food.
+            const perHour = foodPerHour > 0
+                ? foodPerHour
+                : (damagePerHour > 0 ? damagePerHour / heal : 0);
+            if (!perHour) continue;
+            const secondsLeft = (count / perHour) * 3600;
+            const sellPrice = item.attributes?.MIN_MARKET_PRICE || item.attributes?.SELL_PRICE || 0;
+            ingredientDetails.push({
+                itemId, stored: count, perHour, secondsLeft, sellPrice,
+                goldPerHour: perHour * sellPrice,
+            });
+            if (secondsLeft < finishedSeconds) {
+                finishedSeconds = secondsLeft;
+                bottleneck = { itemId, secondsLeft };
+            }
         }
     }
 

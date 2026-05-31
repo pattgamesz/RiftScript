@@ -120,6 +120,10 @@ function readActionEstimates(skillId) {
         if (name === 'XP' && isPerHour) result.xpPerHour = num;
         else if (name === 'Actions' && isPerHour) result.actionsPerHour = num;
         else if (name === 'Monsters' && isPerHour) result.actionsPerHour = num;
+        else if (/^Food$/i.test(name) && isPerHour) result.foodPerHour = num;
+        else if (/Damage(\s*Taken)?$|Health(\s*Lost)?$/i.test(name) && isPerHour) {
+            result.damagePerHour = num;
+        }
     });
 
     if (result.xpPerHour || result.actionsPerHour) {

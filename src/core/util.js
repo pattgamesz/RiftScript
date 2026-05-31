@@ -54,7 +54,9 @@ export function parseNumber(text) {
 // Time formatting
 export function secondsToDuration(sec) {
     sec = Math.floor(sec);
-    if (sec > 86400 * 100) return 'A very long time';
+    if (!Number.isFinite(sec) || sec < 0) return '—';
+    // No upper cap — for crafting / combat the player wants to see the
+    // real number even if it's months out.
     const d = Math.floor(sec / 86400); sec %= 86400;
     const h = Math.floor(sec / 3600);  sec %= 3600;
     const m = Math.floor(sec / 60);    sec %= 60;

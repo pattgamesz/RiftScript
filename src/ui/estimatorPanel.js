@@ -194,9 +194,13 @@ function updateValues(est) {
 
     // Overview
     p.find('[data-field="xpPerHour"]').text(formatNumber(est.xpPerHour));
-    // Finished row also names the bottleneck ingredient (the one that runs out
-    // first) so the player can spot what they need to top up.
-    if (est.isActive) {
+    // Finished row meaning:
+    //   - has bottleneck → show duration + which item runs out first
+    //   - infinite (gathering, or combat without damage estimate) → "Continuous"
+    //   - not active → "Not active"
+    if (!est.isActive) {
+        p.find('[data-field="finished"]').text('Not active');
+    } else if (Number.isFinite(est.finishedSeconds)) {
         let finishedHtml = secondsToDuration(est.finishedSeconds);
         if (est.bottleneck) {
             const name = getItemName(est.bottleneck.itemId);
@@ -204,7 +208,9 @@ function updateValues(est) {
         }
         p.find('[data-field="finished"]').html(finishedHtml);
     } else {
-        p.find('[data-field="finished"]').text('Not active');
+        p.find('[data-field="finished"]').html(
+            `Continuous<span class="rs-extra">no materials being consumed</span>`
+        );
     }
 
     if (est.levelUpSeconds > 0) {
