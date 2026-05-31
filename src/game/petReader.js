@@ -5,7 +5,7 @@ import * as events from '../core/events.js';
 import { parseNumber, debounce } from '../core/util.js';
 import { data } from './data.js';
 import { setPetStats } from '../core/petStats.js';
-import { getUser } from '../core/userCache.js';
+import { getUser, getCachedUser } from '../core/userCache.js';
 
 let inProgress = false;
 let modalObserver = null;
@@ -58,10 +58,43 @@ export function trigger() {
     readPetScreen();
 }
 
+// Synchronous fast-path. Returns null if no cache is hydrated yet — caller
+// should fall through to the async getApiPets() to fetch.
+function getApiPetsSync() {
+    const resp = getCachedUser();
+    return resp ? extractPetsFromUser(resp) : null;
+}
+
 async function getApiPets() {
     const resp = await getUser();
     if (!resp) return null;
     return extractPetsFromUser(resp);
+}
+
+// Attach apiId + apiStats to pets[] using the supplied apiPets list.
+// Returns true when at least one pet's apiId actually changed.
+function enrichPetsWithApi(pets, apiPets) {
+    if (!apiPets?.length) return false;
+    const apiGroups = {};
+    for (const ap of apiPets) {
+        const k = `${ap.name}|${ap.species}|${ap.level}`;
+        if (!apiGroups[k]) apiGroups[k] = [];
+        apiGroups[k].push(ap);
+    }
+    let changed = false;
+    for (const p of pets) {
+        const k = `${p.name}|${p.species}|${p.level}`;
+        const bucket = apiGroups[k];
+        if (bucket && bucket[p.groupIndex]) {
+            const ap = bucket[p.groupIndex];
+            if (p.apiId !== ap.id) {
+                p.apiId = ap.id;
+                p.apiStats = ap;
+                changed = true;
+            }
+        }
+    }
+    return changed;
 }
 
 function extractPetsFromUser(resp) {
@@ -139,35 +172,27 @@ async function readPetScreen() {
                 groupCounters[k] = p.groupIndex + 1;
             }
 
-            // Try to attach unique IDs + stats from getUser API
-            const apiPets = await getApiPets();
-            if (apiPets?.length) {
-                // Match by name+species+level using order within group
-                const apiGroups = {};
-                for (const ap of apiPets) {
-                    const k = `${ap.name}|${ap.species}|${ap.level}`;
-                    if (!apiGroups[k]) apiGroups[k] = [];
-                    apiGroups[k].push(ap);
-                }
-                for (const p of pets) {
-                    const k = `${p.name}|${p.species}|${p.level}`;
-                    const bucket = apiGroups[k];
-                    if (bucket && bucket[p.groupIndex]) {
-                        const ap = bucket[p.groupIndex];
-                        p.apiId = ap.id;
-                        p.apiStats = ap;
-                    }
-                }
-            }
-
             // Remember team membership so we can reconstruct it on sub-tabs
             // where the team DOM isn't rendered (e.g., expedition sub-tab).
-            // Persisted to localStorage so it survives refresh-while-on-Expedition.
             knownTeamNames = new Set(pets.filter(p => p.location === 'team').map(p => p.name));
             saveKnownTeamNames();
 
+            // Synchronous enrichment from whatever is already cached — instant
+            // on hot path (localStorage or in-memory). Chips render NOW with
+            // full data when the cache is warm.
+            enrichPetsWithApi(pets, getApiPetsSync());
+
             lastPets = pets;
             events.emit('reader-pet', pets);
+
+            // Background refresh — fetches getUser if the cache is stale or
+            // empty, then re-emits if new data unlocks any pet IDs. Doesn't
+            // block initial chip render on the cold-start network roundtrip.
+            getApiPets().then(apiPets => {
+                if (enrichPetsWithApi(pets, apiPets)) {
+                    events.emit('reader-pet', pets);
+                }
+            }).catch(() => { /* swallow — sync fallback already emitted */ });
         } else if (lastPets.length) {
             // DOM has no pet rows we recognise, or we're on a non-Pets sub-tab.
             // Re-emit the last good scrape so the expedition calc keeps its data.
