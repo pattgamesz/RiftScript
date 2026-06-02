@@ -60,6 +60,32 @@ const TYPE_VALUATORS = {
             };
         },
     },
+    // Charcoal is converted from logs at the burner (1–8 charcoal per log,
+    // depending on tier). The Charcoal item itself can't be sold on the
+    // market — every listing is a log — so the value is gold per charcoal
+    // yielded after conversion. Floor is exactly 4.00 g/char across every
+    // log tier; thresholds bracket that baseline.
+    'Charcoal': {
+        thresholds: { good: 6.0, neutral: 8.0 },
+        evaluate(item, listing) {
+            const conv = getTypeConversions('Charcoal');
+            const amount = conv?.[item.id];
+            if (!amount) return null;
+            const gPerChar = listing.price / amount;
+            return {
+                sortValue: gPerChar,
+                ratioChip: {
+                    text: `${gPerChar.toFixed(2)} g/char`,
+                    className: thresholdClass(gPerChar, this.thresholds),
+                    title: 'Gold per charcoal yielded after conversion (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${amount} char`,
+                    title: `${item.name} converts to ${amount} charcoal at the burner`,
+                },
+            };
+        },
+    },
 };
 
 // Tribute filters — group multiple item categories, no per-item value sort.
