@@ -73,4 +73,5 @@ A single shared `getUser` request feeds the tome detector, pet reader, combat pa
 
 ## Credits
 
-Based on [ironwood-scripts](https://github.com/Boldy97/ironwood-scripts) by Boldy97/Pancake (MIT License).
+- Based on [ironwood-scripts](https://github.com/Boldy97/ironwood-scripts) by Boldy97/Pancake (MIT License).
+- Combat Sim formulas ported from [Rivea's Ironwood RPG Combat Calc spreadsheet](https://docs.google.com/spreadsheets/d/19iQkvGIyW2f_a3vmF7vNnE2EIEKOOHTNlsKdgnsOtzQ/edit).
