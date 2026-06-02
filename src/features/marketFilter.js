@@ -60,10 +60,36 @@ const TYPE_VALUATORS = {
             };
         },
     },
+    // Compost is converted from fruits at the composter (20–160 compost per
+    // fruit) or from bones/fangs (2–16 compost per piece). Compost itself
+    // isn't a market listing — every listing is a source item. Fruits sit
+    // at 0.40 g/compost market floor, bones at 2.00 g/compost, so the
+    // valuator naturally surfaces fruit listings as the better deal.
+    'Compost': {
+        thresholds: { good: 1.0, neutral: 2.5 },
+        evaluate(item, listing) {
+            const conv = getTypeConversions('Compost');
+            const amount = conv?.[item.id];
+            if (!amount) return null;
+            const gPerCompost = listing.price / amount;
+            return {
+                sortValue: gPerCompost,
+                ratioChip: {
+                    text: `${gPerCompost.toFixed(2)} g/compost`,
+                    className: thresholdClass(gPerCompost, this.thresholds),
+                    title: 'Gold per compost yielded after conversion (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${amount} compost`,
+                    title: `${item.name} converts to ${amount} compost at the composter`,
+                },
+            };
+        },
+    },
     // Charcoal is converted from logs at the burner (1–8 charcoal per log,
     // depending on tier). The Charcoal item itself can't be sold on the
     // market — every listing is a log — so the value is gold per charcoal
-    // yielded after conversion. Floor is exactly 4.00 g/char across every
+    // yielded after conversion. Floor is exactly 4.00 g/coal across every
     // log tier; thresholds bracket that baseline.
     'Charcoal': {
         thresholds: { good: 10.0, neutral: 15.0 },
