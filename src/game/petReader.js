@@ -259,12 +259,28 @@ function maybeReadModal() {
 
     // Resolve which specific pet was clicked: prefer matching by the last
     // clicked DOM row, fall back to first matching name+species+level.
+    // We also grab the apiId off the matched pet so the stat cache is keyed
+    // stably across level-ups (the apiId is the stable identifier).
     let groupIndex = 0;
+    let apiId = null;
     if (lastClickedRow) {
         const match = lastPets.find(p => p.element[0] === lastClickedRow);
-        if (match && match.name === name) groupIndex = match.groupIndex || 0;
+        if (match && match.name === name) {
+            groupIndex = match.groupIndex || 0;
+            apiId = match.apiId || null;
+        }
     }
-    const petKey = { name, species: species?.id, level, groupIndex };
+    if (!apiId) {
+        // Fallback: any pet with matching name+species+level+groupIndex.
+        const match = lastPets.find(p =>
+            p.name === name &&
+            p.species === species?.id &&
+            p.level === level &&
+            (p.groupIndex || 0) === groupIndex
+        );
+        apiId = match?.apiId || null;
+    }
+    const petKey = { name, species: species?.id, level, groupIndex, apiId };
     setPetStats(petKey, {
         species: species?.id,
         family: species?.family,
