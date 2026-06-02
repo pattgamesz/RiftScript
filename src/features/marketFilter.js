@@ -29,6 +29,39 @@ const TYPE_TO_ITEM_NAME = {
     'Potion Mix': 'Potion Mix',
 };
 
+// Per-type valuation overrides. When a type has an `evaluate(item, listing)`
+// here, listings are sorted by that function's sortValue (lowest = best),
+// and the row chips reflect the returned labels. Categories without an entry
+// fall back to the default vendor-price ratio.
+//
+// evaluate returns null when the listing has nothing valuable in this
+// category (e.g. an item without the relevant attribute). null filters it out.
+const TYPE_VALUATORS = {
+    'Food': {
+        match: (item) => (item.attributes?.HEAL || 0) > 0,
+        // gold per HP healed — the market floor is 0.80 g/HP across every
+        // tier of food, so the thresholds bracket that baseline.
+        thresholds: { good: 1.0, neutral: 1.5 },
+        evaluate(item, listing) {
+            const heal = item.attributes?.HEAL;
+            if (!heal) return null;
+            const gPerHp = listing.price / heal;
+            return {
+                sortValue: gPerHp,
+                ratioChip: {
+                    text: `${gPerHp.toFixed(2)} g/HP`,
+                    className: thresholdClass(gPerHp, this.thresholds),
+                    title: 'Gold per HP healed (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${heal} HP`,
+                    title: 'Total HP this food restores per use',
+                },
+            };
+        },
+    },
+};
+
 // Tribute filters — group multiple item categories, no per-item value sort.
 const FLOWERS = new Set(['Daisy', 'Hyacinth', 'Lilac', 'Nemesia', 'Peony', 'Rose', 'Snapdragon', 'Tulip']);
 const VEGETABLES = new Set(['Carrot', 'Chilli', 'Corn', 'Onion', 'Potato', 'Pumpkin', 'Radish', 'Tomato']);
@@ -542,21 +575,42 @@ function applyToListings(marketData) {
 }
 
 // `match(item, listing)` returns true if the listing belongs in the active filter.
-// Decorates kept listings with value + ratio chips, hides the rest, reorders by ratio,
+// Decorates kept listings with value + ratio chips, hides the rest, reorders by sort value,
 // and returns the kept listings (possibly empty).
 function filterByMembership(marketData, match) {
+    const valuator = TYPE_VALUATORS[currentFilter.type];
     const matching = [];
     for (const l of marketData.listings) {
         const item = data.items?.byId?.[l.item];
         if (!item) continue;
         if (!match(item, l)) continue;
-        l.vendorPrice = item.attributes?.SELL_PRICE || 0;
-        l.ratio = l.vendorPrice > 0 ? l.price / l.vendorPrice : Infinity;
+
+        if (valuator) {
+            const ev = valuator.evaluate(item, l);
+            if (!ev) continue; // listing has no value in this category — drop
+            l._eval = ev;
+            l._sort = ev.sortValue;
+        } else {
+            // Default: cost relative to the vendor sell price.
+            const vendorPrice = item.attributes?.SELL_PRICE || 0;
+            const ratio = vendorPrice > 0 ? l.price / vendorPrice : Infinity;
+            l._eval = {
+                sortValue: ratio,
+                ratioChip: Number.isFinite(ratio)
+                    ? { text: `${formatNumber(ratio)}x`, className: ratioClass(ratio),
+                        title: 'Listing price ÷ vendor sell price (lower = better deal)' }
+                    : null,
+                valueChip: vendorPrice
+                    ? { text: formatNumber(vendorPrice), title: 'Vendor sell price per item' }
+                    : null,
+            };
+            l._sort = ratio;
+        }
         matching.push(l);
     }
-    // SELL: lower ratio = better deal (ascending). BUY: reverse.
+    // SELL: lower sort value = better deal (ascending). BUY: reverse.
     const dir = marketData.type === 'BUY' ? -1 : 1;
-    matching.sort((a, b) => dir * (a.ratio - b.ratio));
+    matching.sort((a, b) => dir * (a._sort - b._sort));
 
     const limited = currentFilter.amount > 0
         ? matching.slice(0, currentFilter.amount)
@@ -565,11 +619,17 @@ function filterByMembership(marketData, match) {
 
     for (const l of marketData.listings) {
         if (!keepSet.has(l)) { l.element.hide(); continue; }
-        if (l.vendorPrice) addValueChip(l.element, l.vendorPrice);
-        if (Number.isFinite(l.ratio)) addRatioChip(l.element, l.ratio, ratioClass(l.ratio));
+        if (l._eval?.valueChip) addChip(l.element, 'rs-value-chip', l._eval.valueChip);
+        if (l._eval?.ratioChip) addChip(l.element, 'rs-ratio-chip', l._eval.ratioChip);
     }
     reorderListings(limited);
     return limited;
+}
+
+function thresholdClass(value, thresholds) {
+    if (value <= thresholds.good) return 'rs-ratio-good';
+    if (value <= thresholds.neutral) return 'rs-ratio-neutral';
+    return 'rs-ratio-bad';
 }
 
 function applyRiftHighlight(listings) {
@@ -588,12 +648,12 @@ function applyRiftHighlight(listings) {
     }
 }
 
-function addRatioChip($el, ratio, colorClass = '') {
-    if ($el.find('.rs-ratio-chip').length) return;
-    const title = colorClass ? 'Listing price ÷ vendor sell price (lower = better deal)' : 'Price per unit yield';
-    const chip = `<span class="rs-ratio-chip ${colorClass}" title="${title}">${formatNumber(ratio)}x</span>`;
-    // Prepend inside .cost so chips inherit the right-aligned position of
-    // the price column (the game pushes .cost to the right via flex margin).
+// Generic chip injector — prepends into .cost so the chip inherits the
+// right-aligned position the game pushes the price into.
+function addChip($el, baseClass, { text, className = '', title = '' }) {
+    if ($el.find(`.${baseClass}`).length) return;
+    const cls = className ? `${baseClass} ${className}` : baseClass;
+    const chip = `<span class="${cls}" title="${escapeAttr(title)}">${escapeHtml(text)}</span>`;
     const $cost = $el.find('.cost').first();
     if ($cost.length) $cost.prepend(chip);
     else $el.find('.amount').first().after(chip);
@@ -603,14 +663,6 @@ function ratioClass(ratio) {
     if (ratio <= RATIO_GOOD_MAX) return 'rs-ratio-good';
     if (ratio <= RATIO_NEUTRAL_MAX) return 'rs-ratio-neutral';
     return 'rs-ratio-bad';
-}
-
-function addValueChip($el, sellPrice) {
-    if ($el.find('.rs-value-chip').length) return;
-    const chip = `<span class="rs-value-chip" title="Vendor sell price per item">${formatNumber(sellPrice)}</span>`;
-    const $cost = $el.find('.cost').first();
-    if ($cost.length) $cost.prepend(chip);
-    else $el.find('.amount').first().after(chip);
 }
 
 function reorderListings(listings) {
