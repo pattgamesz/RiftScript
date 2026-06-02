@@ -66,7 +66,7 @@ const TYPE_VALUATORS = {
     // yielded after conversion. Floor is exactly 4.00 g/char across every
     // log tier; thresholds bracket that baseline.
     'Charcoal': {
-        thresholds: { good: 6.0, neutral: 8.0 },
+        thresholds: { good: 10.0, neutral: 15.0 },
         evaluate(item, listing) {
             const conv = getTypeConversions('Charcoal');
             const amount = conv?.[item.id];
