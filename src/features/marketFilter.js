@@ -61,18 +61,10 @@ const TYPE_VALUATORS = {
         },
     },
     // Compost is converted from fruits at the composter (20–160 compost per
-    // fruit). Our drops data still has historical bone/fang → compost rows
-    // from before that conversion was removed, so we whitelist the fruits
-    // explicitly to match what the in-game composter actually accepts today.
-    // Market floor for fruits is 0.40 g/compost.
+    // fruit). Market floor is 0.40 g/compost; thresholds bracket that.
     'Compost': {
-        thresholds: { good: 1.0, neutral: 2.5 },
-        validSources: new Set([
-            'Apple', 'Grapes', 'Cherry', 'Green Apple',
-            'Blackcurrant', 'Raspberry', 'Blueberry', 'Banana',
-        ]),
+        thresholds: { good: 0.5, neutral: 1.0 },
         evaluate(item, listing) {
-            if (!this.validSources.has(item.name)) return null;
             const conv = getTypeConversions('Compost');
             const amount = conv?.[item.id];
             if (!amount) return null;
