@@ -41,7 +41,7 @@ const TYPE_VALUATORS = {
         match: (item) => (item.attributes?.HEAL || 0) > 0,
         // gold per HP healed — the market floor is 0.80 g/HP across every
         // tier of food, so the thresholds bracket that baseline.
-        thresholds: { good: 1.0, neutral: 1.5 },
+        thresholds: { good: 1.5, neutral: 2.0 },
         evaluate(item, listing) {
             const heal = item.attributes?.HEAL;
             if (!heal) return null;
