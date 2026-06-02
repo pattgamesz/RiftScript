@@ -71,16 +71,16 @@ const TYPE_VALUATORS = {
             const conv = getTypeConversions('Charcoal');
             const amount = conv?.[item.id];
             if (!amount) return null;
-            const gPerChar = listing.price / amount;
+            const gPerCoal = listing.price / amount;
             return {
-                sortValue: gPerChar,
+                sortValue: gPerCoal,
                 ratioChip: {
-                    text: `${gPerChar.toFixed(2)} g/char`,
-                    className: thresholdClass(gPerChar, this.thresholds),
+                    text: `${gPerCoal.toFixed(2)} g/coal`,
+                    className: thresholdClass(gPerCoal, this.thresholds),
                     title: 'Gold per charcoal yielded after conversion (lower = better deal)',
                 },
                 valueChip: {
-                    text: `${amount} char`,
+                    text: `${amount} coal`,
                     title: `${item.name} converts to ${amount} charcoal at the burner`,
                 },
             };
