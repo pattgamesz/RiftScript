@@ -65,7 +65,7 @@ const TYPE_VALUATORS = {
     // every listing is a gem source. Market floor is exactly 2.40 g/powder
     // across every gem tier; thresholds bracket that baseline.
     'Arcane Powder': {
-        thresholds: { good: 4.0, neutral: 6.0 },
+        thresholds: { good: 2.5, neutral: 4.0 },
         evaluate(item, listing) {
             const conv = getTypeConversions('Arcane Powder');
             const amount = conv?.[item.id];
