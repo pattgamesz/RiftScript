@@ -134,6 +134,20 @@ function applyRecipeClickthrough() {
     $('skill-page button.row[disabled]').removeAttr('disabled');
 }
 
+// Skill pages with sub-tabs (Outskirts/Village, etc) swap in fresh disabled
+// buttons every time the user clicks a tab — no page event fires, so the
+// one-shot apply on navigation only catches the initial tab. Run a light
+// poller while we're on an action page so newly-rendered tabs also get
+// their disabled flags stripped. Self-stops when we leave the page or the
+// setting is turned off.
+const clickthroughPoller = pollUntilDone(() => {
+    const page = events.last('page');
+    if (page?.type !== 'action') return false;
+    if (!settings.get('recipe-clickthrough')) return false;
+    applyRecipeClickthrough();
+}, 300);
+clickthroughPoller.stop();
+
 // ─── Init ────────────────────────────────────────────────────
 
 const GAME_PAGES = 'skill-page, equipment-page, home-page, market-page, merchant-page, settings-page, taming-page, profile-page, quests-page, guild-page, adventure-page, challenges-page, leaderboards-page, upgrade-page, traits-page, mastery-page, marks-page, store-page, daily-quest-page, changelog-page';
@@ -178,6 +192,7 @@ export function initMenu() {
         }
         if (page.type === 'action' && settings.get('recipe-clickthrough')) {
             setTimeout(applyRecipeClickthrough, 200);
+            clickthroughPoller.start();
         }
     });
     window.addEventListener('riftscript-discord-updated', () => {
@@ -609,6 +624,14 @@ function renderPage() {
     page.find('#rs-recipe-clickthrough').on('change', function() {
         settings.set('recipe-clickthrough', $(this).is(':checked'));
         applyRecipeClickthrough();
+        // Toggle the poller immediately so the user doesn't have to navigate
+        // away and back for tabs to start clicking through.
+        const p = events.last('page');
+        if ($(this).is(':checked') && p?.type === 'action') {
+            clickthroughPoller.start();
+        } else {
+            clickthroughPoller.stop();
+        }
     });
 
     page.find('.rs-feature-toggle').on('change', function() {
