@@ -60,6 +60,30 @@ const TYPE_VALUATORS = {
             };
         },
     },
+    // Sigil Pieces come from breaking down sigils (2–16 pieces per sigil,
+    // scaling with tier and type). Floor is exactly 14.00 g/piece across
+    // every sigil source; thresholds bracket that baseline.
+    'Sigil Pieces': {
+        thresholds: { good: 21.0, neutral: 28.0 },
+        evaluate(item, listing) {
+            const conv = getTypeConversions('Sigil Pieces');
+            const amount = conv?.[item.id];
+            if (!amount) return null;
+            const gPerPiece = listing.price / amount;
+            return {
+                sortValue: gPerPiece,
+                ratioChip: {
+                    text: `${gPerPiece.toFixed(2)} g/piece`,
+                    className: thresholdClass(gPerPiece, this.thresholds),
+                    title: 'Gold per sigil piece yielded after conversion (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${amount} pieces`,
+                    title: `${item.name} breaks down into ${amount} sigil pieces`,
+                },
+            };
+        },
+    },
     // Metal Parts are converted from smithed gear (2–24 parts per item,
     // depending on tier and slot). 136 source items in total — too many to
     // list manually, but the conv map handles it. Floor is exactly 16.00
