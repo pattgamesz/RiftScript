@@ -60,6 +60,30 @@ const TYPE_VALUATORS = {
             };
         },
     },
+    // Research Points come from converting logbooks (1–8 points per book,
+    // scaling with tier from Beginner to Elite). Floor is exactly 4.00
+    // g/point across every logbook; thresholds bracket that baseline.
+    'Research Points': {
+        thresholds: { good: 6.0, neutral: 8.0 },
+        evaluate(item, listing) {
+            const conv = getTypeConversions('Research Points');
+            const amount = conv?.[item.id];
+            if (!amount) return null;
+            const gPerPoint = listing.price / amount;
+            return {
+                sortValue: gPerPoint,
+                ratioChip: {
+                    text: `${gPerPoint.toFixed(2)} g/point`,
+                    className: thresholdClass(gPerPoint, this.thresholds),
+                    title: 'Gold per research point yielded after conversion (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${amount} point${amount === 1 ? '' : 's'}`,
+                    title: `${item.name} converts to ${amount} research point${amount === 1 ? '' : 's'}`,
+                },
+            };
+        },
+    },
     // Sigil Pieces come from breaking down sigils (2–16 pieces per sigil,
     // scaling with tier and type). Floor is exactly 14.00 g/piece across
     // every sigil source; thresholds bracket that baseline.
