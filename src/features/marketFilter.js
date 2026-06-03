@@ -60,6 +60,31 @@ const TYPE_VALUATORS = {
             };
         },
     },
+    // Metal Parts are converted from smithed gear (2–24 parts per item,
+    // depending on tier and slot). 136 source items in total — too many to
+    // list manually, but the conv map handles it. Floor is exactly 16.00
+    // g/part across every source; thresholds bracket that baseline.
+    'Metal Parts': {
+        thresholds: { good: 24.0, neutral: 32.0 },
+        evaluate(item, listing) {
+            const conv = getTypeConversions('Metal Parts');
+            const amount = conv?.[item.id];
+            if (!amount) return null;
+            const gPerPart = listing.price / amount;
+            return {
+                sortValue: gPerPart,
+                ratioChip: {
+                    text: `${gPerPart.toFixed(2)} g/part`,
+                    className: thresholdClass(gPerPart, this.thresholds),
+                    title: 'Gold per metal part yielded after conversion (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${amount} parts`,
+                    title: `${item.name} converts to ${amount} metal parts`,
+                },
+            };
+        },
+    },
     // Pet Snacks are converted from raw fish at the pet feeder (1–8 snacks
     // per fish, scaling with tier). Floor varies by fish — King Crab is the
     // cheapest at 4.50 g/snack, Shrimp the most expensive at 8.00, so the
