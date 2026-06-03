@@ -60,6 +60,30 @@ const TYPE_VALUATORS = {
             };
         },
     },
+    // Potion Mix is converted from used potions (6–34 mix per potion,
+    // scaling with tier and type). 27 source potions in total. Floor sits
+    // around ~5 g/mix after the in-game rebalance to 6+4n yields.
+    'Potion Mix': {
+        thresholds: { good: 6.0, neutral: 8.0 },
+        evaluate(item, listing) {
+            const conv = getTypeConversions('Potion Mix');
+            const amount = conv?.[item.id];
+            if (!amount) return null;
+            const gPerMix = listing.price / amount;
+            return {
+                sortValue: gPerMix,
+                ratioChip: {
+                    text: `${gPerMix.toFixed(2)} g/mix`,
+                    className: thresholdClass(gPerMix, this.thresholds),
+                    title: 'Gold per potion mix yielded after conversion (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${amount} mix`,
+                    title: `${item.name} converts to ${amount} potion mix`,
+                },
+            };
+        },
+    },
     // Research Points come from converting logbooks (1–8 points per book,
     // scaling with tier from Beginner to Elite). Floor is exactly 4.00
     // g/point across every logbook; thresholds bracket that baseline.
