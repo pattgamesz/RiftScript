@@ -60,6 +60,31 @@ const TYPE_VALUATORS = {
             };
         },
     },
+    // Arcane Powder is converted from gems at the arcane crafter (50–400
+    // powder per gem, scaling with tier). Powder itself isn't tradeable —
+    // every listing is a gem source. Market floor is exactly 2.40 g/powder
+    // across every gem tier; thresholds bracket that baseline.
+    'Arcane Powder': {
+        thresholds: { good: 4.0, neutral: 6.0 },
+        evaluate(item, listing) {
+            const conv = getTypeConversions('Arcane Powder');
+            const amount = conv?.[item.id];
+            if (!amount) return null;
+            const gPerPowder = listing.price / amount;
+            return {
+                sortValue: gPerPowder,
+                ratioChip: {
+                    text: `${gPerPowder.toFixed(2)} g/powder`,
+                    className: thresholdClass(gPerPowder, this.thresholds),
+                    title: 'Gold per arcane powder yielded after conversion (lower = better deal)',
+                },
+                valueChip: {
+                    text: `${amount} powder`,
+                    title: `${item.name} converts to ${amount} arcane powder`,
+                },
+            };
+        },
+    },
     // Compost is converted from fruits at the composter (20–160 compost per
     // fruit). Market floor is 0.40 g/compost; thresholds bracket that.
     'Compost': {
