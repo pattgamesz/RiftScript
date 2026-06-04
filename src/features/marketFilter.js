@@ -420,6 +420,25 @@ function getTypeConversions(typeKey) {
     return conv?.[targetId] || null;
 }
 
+// Resolve which items belong to a Best-deal type. Prefers the valuator's own
+// match() when defined (attribute-based, e.g. Food → HEAL > 0), then falls
+// back to the conversion-target lookup. Returns an array of items, or null
+// when neither path resolves.
+function getTypeMatchingItems(typeKey) {
+    const valuator = TYPE_VALUATORS[typeKey];
+    if (valuator?.match && data.items?.list) {
+        const items = data.items.list.filter(i => valuator.match(i));
+        if (items.length) return items;
+    }
+    const conv = getTypeConversions(typeKey);
+    if (conv) {
+        return Object.keys(conv)
+            .map(id => data.items.byId[id])
+            .filter(Boolean);
+    }
+    return null;
+}
+
 // ─── Panel ──────────────────────────────────────────────────
 
 function ensurePanel() {
@@ -714,10 +733,10 @@ function applyFilter(patch) {
     if (currentFilter.tribute && TRIBUTES[currentFilter.tribute]) {
         setMarketSearch('');
     } else if (currentFilter.type && currentFilter.type !== 'None') {
-        const conv = getTypeConversions(currentFilter.type);
-        if (conv) {
-            const names = Object.keys(conv)
-                .map(id => data.items.byId[id]?.name)
+        const items = getTypeMatchingItems(currentFilter.type);
+        if (items?.length) {
+            const names = items
+                .map(i => i.name)
                 .filter(Boolean)
                 .map(n => `^${escapeRegex(n)}`)
                 .join('|');
@@ -796,8 +815,11 @@ function applyToListings(marketData) {
     }
     const typeActive = currentFilter.type && currentFilter.type !== 'None';
     if (typeActive) {
-        const conv = getTypeConversions(currentFilter.type);
-        if (conv) kept = filterByMembership(marketData, (_, listing) => !!conv[listing.item]);
+        const items = getTypeMatchingItems(currentFilter.type);
+        if (items?.length) {
+            const allowed = new Set(items.map(i => i.id));
+            kept = filterByMembership(marketData, (_, listing) => allowed.has(listing.item));
+        }
     }
 
     if (riftMode !== 'off' && memberCount) applyRiftHighlight(kept);
