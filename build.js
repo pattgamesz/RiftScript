@@ -18,6 +18,7 @@ const HEADER = `// ==UserScript==
 // @connect      api-2.ironwoodrpg.com
 // @connect      rift-script.web.app
 // @connect      rift-script--dev-y8m8gvy1.web.app
+// @connect      rift-guild.com
 // @connect      firestore.googleapis.com
 // @noframes
 // @require      https://code.jquery.com/jquery-3.6.4.min.js
@@ -26,7 +27,8 @@ const HEADER = `// ==UserScript==
 // @connect explained:
 // - api-2.ironwoodrpg.com : Fetches your player data (stats, equipment, inventory, market listings) for combat/market features.
 //   Uses your existing game session token from IndexedDB — never stored or sent anywhere else.
-// - rift-script.web.app : Hosts the script, public game data (items, skills, monsters, drops), Discord OAuth callback, update checks.
+// - rift-script.web.app : Hosts the script, Discord OAuth callback, update checks.
+// - rift-guild.com : Public game data API (items, actions, drops, monsters, etc.) — extracted from ironwoodrpg main.js, CORS-open, 1h CDN-cached.
 // - firestore.googleapis.com : Public read of Rift guild member list for market highlighting.
 //
 // Discord OAuth: Used to link your Discord account. We only request your username, avatar, and user ID.

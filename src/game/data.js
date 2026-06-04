@@ -1,9 +1,24 @@
 // Game data cache — stale-while-revalidate. On startup we use cached data
 // immediately (instant feature activation) and refresh in the background.
 // Cache key includes script version so new builds invalidate stale shapes.
+//
+// Source is the rift-guild gameData API (see core/api.js). The raw shape it
+// returns differs from what the rest of the script consumes, so this module
+// owns the adapter — every consumer (estimator, market filter, pet reader,
+// combat sim, …) reads from the indexed `data.*` structure built below.
 import { api } from '../core/api.js';
 
 const CACHE_KEY = `riftscript-gamedata-cache-v${typeof RIFTSCRIPT_VERSION !== 'undefined' ? RIFTSCRIPT_VERSION : '0'}`;
+
+// Old-data action ids were integers; the new API uses string ids ("63",
+// "conv-60"). Numeric-looking ids get coerced for backward compat with code
+// that does `byId[+url_segment]`; string ids like "conv-60" stay as strings.
+function parseId(v) {
+    if (v == null) return null;
+    if (typeof v === 'number') return v;
+    const n = +v;
+    return Number.isFinite(n) && String(n) === String(v).trim() ? n : v;
+}
 
 function pruneOldCaches() {
     try {
@@ -16,15 +31,13 @@ function pruneOldCaches() {
     } catch (e) { /* noop */ }
 }
 
-function index(arr, ...keys) {
-    const result = {};
-    for (const key of keys) result[key] = {};
+function indexBy(arr, key) {
+    const out = {};
     for (const item of arr) {
-        for (const key of keys) {
-            if (item[key] !== undefined) result[key][item[key]] = item;
-        }
+        const v = item?.[key];
+        if (v !== undefined && v !== null) out[v] = item;
     }
-    return result;
+    return out;
 }
 
 export const data = {
@@ -56,127 +69,377 @@ function loadCache() {
     } catch (e) { return null; }
 }
 
+// ─── Adapters ─────────────────────────────────────────────
+
+// Items in the new API have gameplay attributes as top-level fields (price,
+// minMarketPrice, stats.heal, …). The rest of the script reads them as
+// item.attributes.SCREAMING_SNAKE_CASE, so we build that nested object.
+function adaptItem(raw) {
+    const attributes = {};
+    if (raw.price != null) attributes.SELL_PRICE = raw.price;
+    if (raw.minMarketPrice != null) attributes.MIN_MARKET_PRICE = raw.minMarketPrice;
+    if (raw.untradeable) attributes.UNTRADEABLE = true;
+    if (raw.tier != null) attributes.TIER = raw.tier;
+
+    const stats = raw.stats || {};
+    if (stats.heal != null) attributes.HEAL = stats.heal;
+    // Sigil / potion / brew slot durations are all 180s in-game. The API
+    // exposes an enum string (e.g. "B" / "G" / "Y") whose mapping isn't
+    // documented; treat any non-empty duration field as the standard 180s.
+    if (stats.duration) attributes.DURATION = 180;
+    if (stats.traitEffect != null) attributes.TRAIT_EFFECT_PERCENT = stats.traitEffect;
+    if (stats.traitExpGain != null) attributes.TRAIT_EXP_GAIN_PERCENT = stats.traitExpGain;
+    if (stats.traitPointGain != null) attributes.TRAIT_POINT_GAIN_PERCENT = stats.traitPointGain;
+    // Pass any remaining stats through as upper-snake-case so combat-sim style
+    // lookups (efficiency, double-loot, etc.) keep working.
+    for (const [k, v] of Object.entries(stats)) {
+        if (k === 'heal' || k === 'duration' || k.startsWith('trait')) continue;
+        // Convert camelCase → SCREAMING_SNAKE_CASE
+        const key = k.replace(/([A-Z])/g, '_$1').toUpperCase();
+        if (attributes[key] == null) attributes[key] = v;
+    }
+
+    return {
+        id: parseId(raw.id),
+        name: raw.displayName || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        displayName: raw.displayName,
+        image: raw.image,
+        tier: raw.tier,
+        skill: raw.skill != null ? parseId(raw.skill) : null,
+        attributes,
+        stats: { global: stats, bySkill: {} },
+    };
+}
+
+function adaptSkill(raw, index) {
+    return {
+        id: raw.id != null ? parseId(raw.id) : -(index + 1),
+        displayName: raw.displayName || raw.technicalName || `Skill ${index}`,
+        technicalName: raw.technicalName,
+        type: raw.type || 'Other',
+        color: raw.color || '#999',
+        image: raw.image,
+        actions: raw.actions,
+        actionGroups: raw.actionGroups,
+    };
+}
+
+// Skill-page action — gather/craft visible on a skill's action list. May
+// embed materials (inputs) and drops (outputs) which we flatten out so the
+// estimator can read them via `data.drops.byAction` / `data.ingredients
+// .byAction` exactly like before.
+function adaptSkillAction(raw) {
+    return {
+        id: parseId(raw.id),
+        name: raw.displayName || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        displayName: raw.displayName,
+        type: 'ACTIVITY',
+        level: raw.level,
+        exp: raw.exp,
+        speed: raw.speed,
+        tier: raw.tier,
+        image: raw.image,
+        monsterId: raw.monsterId ? parseId(raw.monsterId.id ?? raw.monsterId) : null,
+    };
+}
+
+// Conversion action — burner, composter, arcane crafter, pet feeder, etc.
+// IDs are strings like "conv-60"; kept as-is for byId lookups.
+function adaptConversionAction(raw) {
+    return {
+        id: raw.id,
+        name: raw.displayName || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        displayName: raw.displayName,
+        type: 'CONVERSION',
+        level: raw.level,
+        exp: raw.exp,
+        speed: raw.speed,
+        speedManual: raw.speedManual,
+        speedAutomation: raw.speedAutomation,
+        skill: raw.skill != null ? parseId(raw.skill) : null,
+        recipeId: raw.recipeId,
+    };
+}
+
+function adaptMonster(raw) {
+    const speedEnumValues = { Slow: 3, Normal: 2.5, Fast: 2, VeryFast: 1.5 };
+    let speedNum = raw.speed;
+    if (typeof raw.speed === 'object' && raw.speed?.name) {
+        speedNum = speedEnumValues[raw.speed.name] ?? 2.5;
+    }
+    let attackStyle = raw.attackStyle;
+    if (typeof raw.attackStyle === 'object') attackStyle = raw.attackStyle?.name || 'TwoHanded';
+    return {
+        id: parseId(raw.id),
+        name: raw.displayName || raw.name || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        image: raw.image,
+        level: raw.level,
+        health: raw.health,
+        attack: raw.damage ?? raw.attack,
+        armour: raw.armour,
+        attackStyle,
+        speed: speedNum,
+    };
+}
+
+function adaptStructure(raw, index) {
+    return {
+        id: raw.id != null ? parseId(raw.id) : -(index + 1),
+        name: raw.displayName || raw.name || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        image: raw.image,
+        description: raw.description,
+        skill: typeof raw.skill === 'object' ? parseId(raw.skill?.id) : raw.skill,
+    };
+}
+
+function adaptPet(raw, index) {
+    return {
+        id: raw.id != null ? parseId(raw.id) : -(index + 1),
+        name: raw.displayName || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        displayName: raw.displayName,
+        species: raw.species,
+        // The API doesn't expose a 'family' — group same-tier species together
+        // by the first ability key as a best-effort proxy. PetReader matches
+        // by species image elsewhere, so the family field is only used as a
+        // filter label and survives a rough grouping.
+        family: deriveFamily(raw),
+        image: raw.image,
+        tier: raw.tier,
+        stats: raw.stats,
+        abilities: raw.abilities,
+        evolve: raw.evolve,
+    };
+}
+
+function deriveFamily(rawPet) {
+    const abilities = rawPet.abilities || {};
+    const keys = Object.keys(abilities);
+    if (keys.length === 1) return capitalize(keys[0]);
+    if (keys.length >= 2) return capitalize(keys[0]) + '/' + capitalize(keys[1]);
+    return rawPet.species || rawPet.technicalName || 'Unknown';
+}
+
+function capitalize(s) {
+    return s ? s[0].toUpperCase() + s.slice(1) : '';
+}
+
+function adaptPetPassive(raw, index) {
+    return {
+        id: raw.id != null ? parseId(raw.id) : -(index + 1),
+        name: raw.displayName || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        group: raw.group,
+        tier: raw.tier,
+        stats: raw.stats || {},
+    };
+}
+
+function adaptExpedition(raw, index) {
+    // technicalName like "Expedition10" — strip prefix for tier (10).
+    const m = (raw.technicalName || '').match(/Expedition(\d+)/);
+    const tier = m ? +m[1] : (index + 1);
+    return {
+        id: raw.id != null ? parseId(raw.id) : -(index + 1),
+        name: raw.displayName || raw.technicalName || '',
+        technicalName: raw.technicalName,
+        tier,
+        // Each category (wood/ore/flowers/…) is an array of {id, ratio}; pass
+        // through so consumers can read them as-is.
+        categories: {
+            wood: raw.wood, ore: raw.ore, flowers: raw.flowers, veges: raw.veges,
+            fish: raw.fish, bones: raw.bones, crystals: raw.crystals, logbooks: raw.logbooks,
+        },
+    };
+}
+
+function adaptExpeditionDrop(raw) {
+    return {
+        expedition: raw.expeditionId != null ? parseId(raw.expeditionId) : raw.expeditionTechnicalName,
+        category: raw.category,
+        item: parseId(raw.itemId),
+        ratio: raw.ratio,
+    };
+}
+
+// ─── processRawData ───────────────────────────────────────
+
 function processRawData(raw) {
-    const { skills, actions, items, drops, ingredients, structures, monsters, pets, petPassives, expeditions, expeditionDrops } = raw;
+    const items = (raw.items || []).map(adaptItem);
+    const skills = (raw.skills || []).map(adaptSkill);
+    const skillActions = (raw.actions || []).map(adaptSkillAction);
+    const conversionActions = (raw.conversionActions || []).map(adaptConversionAction);
+    const allActions = [...skillActions, ...conversionActions];
+    const monsters = (raw.monsters || []).map(adaptMonster);
+    const structures = (raw.structures || []).map(adaptStructure);
+    const pets = (raw.pets || []).map(adaptPet);
+    const petPassives = (raw.petPassives || []).map(adaptPetPassive);
+    const expeditions = (raw.expeditions || []).map(adaptExpedition);
+    const expeditionDrops = (raw.expeditionDrops || []).map(adaptExpeditionDrop);
 
-    data.skills = {
-        list: skills,
-        byId: index(skills, 'id').id,
-        byName: index(skills, 'displayName').displayName,
-        byTechnicalName: index(skills, 'technicalName').technicalName,
-    };
+    // Drops + ingredients are reconstructed from the embedded materials/drops
+    // arrays on actions + conversionActions. The /drops endpoint covers
+    // skill-action drops (gather-style); /actions has them embedded too and
+    // is what we use here for completeness with ingredients/conversions.
+    const allDrops = [];
+    const allIngredients = [];
 
-    data.actions = {
-        list: actions,
-        byId: index(actions, 'id').id,
-        byName: index(actions, 'name').name,
-    };
+    for (const a of (raw.actions || [])) {
+        const aid = parseId(a.id);
+        for (const dd of (a.drops || [])) {
+            allDrops.push({
+                action: aid, item: parseId(dd.id),
+                chance: dd.chance, amount: dd.amount ?? 1,
+                type: null,
+            });
+        }
+        for (const dd of (a.rareDrops || [])) {
+            allDrops.push({
+                action: aid, item: parseId(dd.id),
+                chance: dd.chance, amount: dd.amount ?? 1,
+                type: 'RARE',
+            });
+        }
+        for (const dd of (a.failDrops || [])) {
+            allDrops.push({
+                action: aid, item: parseId(dd.id),
+                chance: dd.chance, amount: dd.amount ?? 1,
+                type: 'FAILED',
+            });
+        }
+        for (const dd of (a.monsterDrops || [])) {
+            allDrops.push({
+                action: aid, item: parseId(dd.id),
+                chance: dd.chance, amount: dd.amount ?? 1,
+                type: 'MONSTER',
+            });
+        }
+        for (const m of (a.materials || [])) {
+            allIngredients.push({ action: aid, item: parseId(m.id), amount: m.amount });
+        }
+    }
 
-    // Items API returns {item: {id, name, image, ...}, stats: {...}}
-    // Flatten to {id, name, image, stats, attributes, ...}
-    const flatItems = items.map(entry =>
-        entry.item ? { ...entry.item, stats: entry.stats || { global: {}, bySkill: {} } } : entry
-    );
+    for (const ca of (raw.conversionActions || [])) {
+        const aid = ca.id;
+        for (const dd of (ca.drops || [])) {
+            // For market-filter conversions (Pine Log → Charcoal etc) the
+            // gold-per-yield calc needs the manual yield, not automation.
+            // The API exposes both; we store manual under `amount` so the
+            // existing valuator code reads the right value.
+            allDrops.push({
+                action: aid, item: parseId(dd.id),
+                chance: dd.chance,
+                amount: dd.amountManual ?? dd.amount ?? 1,
+                amountAutomation: dd.amountAutomation,
+                amountManual: dd.amountManual,
+                type: 'CONVERSION',
+            });
+        }
+        for (const m of (ca.materials || [])) {
+            allIngredients.push({ action: aid, item: parseId(m.id), amount: m.amount });
+        }
+    }
+
+    // ─── Index ─────────────────────────────────────────────
 
     const itemsByImage = {};
-    for (const item of flatItems) {
+    for (const item of items) {
         if (item.image) {
             itemsByImage[item.image] = item;
-            const filename = item.image.split('/').pop();
+            const filename = String(item.image).split('/').pop();
             if (filename) itemsByImage[filename] = item;
         }
     }
-
     data.items = {
-        list: flatItems,
-        byId: index(flatItems, 'id').id,
-        byName: index(flatItems, 'name').name,
+        list: items,
+        byId: indexBy(items, 'id'),
+        byName: indexBy(items, 'name'),
         byImage: itemsByImage,
     };
 
+    data.skills = {
+        list: skills,
+        byId: indexBy(skills, 'id'),
+        byName: indexBy(skills, 'displayName'),
+        byTechnicalName: indexBy(skills, 'technicalName'),
+    };
+
+    data.actions = {
+        list: allActions,
+        byId: indexBy(allActions, 'id'),
+        byName: indexBy(allActions, 'name'),
+    };
+
     const dropsByAction = {};
-    for (const drop of drops) {
-        if (!dropsByAction[drop.action]) dropsByAction[drop.action] = [];
-        dropsByAction[drop.action].push(drop);
+    for (const d of allDrops) {
+        if (!dropsByAction[d.action]) dropsByAction[d.action] = [];
+        dropsByAction[d.action].push(d);
     }
-    data.drops = { list: drops, byAction: dropsByAction };
+    data.drops = { list: allDrops, byAction: dropsByAction };
 
     const ingredientsByAction = {};
-    for (const ing of ingredients) {
-        if (!ingredientsByAction[ing.action]) ingredientsByAction[ing.action] = [];
-        ingredientsByAction[ing.action].push(ing);
+    for (const i of allIngredients) {
+        if (!ingredientsByAction[i.action]) ingredientsByAction[i.action] = [];
+        ingredientsByAction[i.action].push(i);
     }
-    data.ingredients = { list: ingredients, byAction: ingredientsByAction };
-
-    data.structures = {
-        list: structures,
-        byId: index(structures, 'id').id,
-        byName: index(structures, 'name').name,
-    };
+    data.ingredients = { list: allIngredients, byAction: ingredientsByAction };
 
     data.monsters = {
         list: monsters,
-        byId: index(monsters, 'id').id,
+        byId: indexBy(monsters, 'id'),
     };
 
-    if (pets) {
-        const petsByImage = {};
-        for (const p of pets) {
-            if (p.image) {
-                petsByImage[p.image] = p;
-                const filename = String(p.image).split('/').pop();
-                if (filename) petsByImage[filename] = p;
-            }
+    data.structures = {
+        list: structures,
+        byId: indexBy(structures, 'id'),
+        byName: indexBy(structures, 'name'),
+    };
+
+    const petsByImage = {};
+    for (const p of pets) {
+        if (p.image) {
+            petsByImage[p.image] = p;
+            const filename = String(p.image).split('/').pop();
+            if (filename) petsByImage[filename] = p;
         }
-        data.pets = {
-            list: pets,
-            byId: index(pets, 'id').id,
-            byImage: petsByImage,
-        };
     }
-    if (petPassives) {
-        data.petPassives = {
-            list: petPassives,
-            byId: index(petPassives, 'id').id,
-        };
+    data.pets = {
+        list: pets,
+        byId: indexBy(pets, 'id'),
+        byImage: petsByImage,
+    };
+
+    data.petPassives = {
+        list: petPassives,
+        byId: indexBy(petPassives, 'id'),
+    };
+
+    data.expeditions = {
+        list: expeditions,
+        byId: indexBy(expeditions, 'id'),
+        byTier: indexBy(expeditions, 'tier'),
+    };
+
+    const expDropsByExpedition = {};
+    for (const d of expeditionDrops) {
+        if (!expDropsByExpedition[d.expedition]) expDropsByExpedition[d.expedition] = [];
+        expDropsByExpedition[d.expedition].push(d);
     }
-    if (expeditions) {
-        data.expeditions = {
-            list: expeditions,
-            byId: index(expeditions, 'id').id,
-            byTier: index(expeditions, 'tier').tier,
-        };
-    }
-    if (expeditionDrops) {
-        const byExpedition = {};
-        for (const d of expeditionDrops) {
-            if (!byExpedition[d.expedition]) byExpedition[d.expedition] = [];
-            byExpedition[d.expedition].push(d);
-        }
-        data.expeditionDrops = {
-            list: expeditionDrops,
-            byExpedition,
-        };
-    }
+    data.expeditionDrops = {
+        list: expeditionDrops,
+        byExpedition: expDropsByExpedition,
+    };
 
     data.ready = true;
 }
 
 async function fetchFresh() {
-    const [skills, actions, items, drops, ingredients, structures, monsters, pets, petPassives, expeditions, expeditionDrops] = await Promise.all([
-        api.listSkills(),
-        api.listActions(),
-        api.listItems(),
-        api.listDrops(),
-        api.listIngredients(),
-        api.listStructures(),
-        api.listMonsters(),
-        api.listPets().catch(() => null),
-        api.listPetPassives().catch(() => null),
-        api.listExpeditions().catch(() => null),
-        api.listExpeditionDrops().catch(() => null),
-    ]);
-    return { skills, actions, items, drops, ingredients, structures, monsters, pets, petPassives, expeditions, expeditionDrops };
+    return api.fetchAllGameData();
 }
 
 export async function loadGameData() {

@@ -1,20 +1,26 @@
 // Ironwood RPG data API client
+//
+// Public game data is sourced from the Rift Guild gameData API at
+// rift-guild.com/api/gameData — extracted live from ironwoodrpg.com's main.js
+// and cached on a 1h CDN. Single /all endpoint pulls everything (~580KB) in
+// one request; the adapter in game/data.js maps the new flat shape onto the
+// indexed structure the rest of the script expects.
+//
+// Authenticated player data still goes to api-2.ironwoodrpg.com using the
+// game's own session token (read from IndexedDB; never persisted).
 import { getAuthToken } from './auth.js';
 import { gmFetch } from './request.js';
 import { getMode } from '../game/mode.js';
 
-// All public game data is served from our own Firebase Hosting — we don't
-// hit any third-party data API at runtime. Dev builds read from the dev
-// channel so new data files can be tested before going to prod.
-const API_HOSTED = (typeof RIFTSCRIPT_DEV !== 'undefined' && RIFTSCRIPT_DEV)
-    ? 'https://rift-script--dev-y8m8gvy1.web.app/data'
-    : 'https://rift-script.web.app/data';
+const GAMEDATA_ROOT = 'https://rift-guild.com/api/gameData';
 const API_AUTH_ROOT = 'https://api-2.ironwoodrpg.com';
 
-async function fetchJSON(path) {
-    const headers = { 'Content-Type': 'application/json' };
-    const file = path.split('/').pop() + '.json';
-    return gmFetch(`${API_HOSTED}/${file}`, { headers, retries: 2 });
+function fetchGameData(type) {
+    const url = type ? `${GAMEDATA_ROOT}/${type}` : GAMEDATA_ROOT;
+    return gmFetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        retries: 2,
+    });
 }
 
 function fetchAuth(path) {
@@ -29,26 +35,25 @@ function fetchAuth(path) {
     });
 }
 
-// Game data endpoints
 export const api = {
-    listSkills:          () => fetchJSON('public/list/skill'),
-    listActions:         () => fetchJSON('public/list/action'),
-    listItems:           () => fetchJSON('public/list/item'),
-    listItemStats:       () => fetchJSON('public/list/itemStat'),
-    listItemAttributes:  () => fetchJSON('public/list/itemAttribute'),
-    listDrops:           () => fetchJSON('public/list/drop'),
-    listIngredients:     () => fetchJSON('public/list/ingredient'),
-    listMonsters:        () => fetchJSON('public/list/monster'),
-    listStructures:      () => fetchJSON('public/list/structure'),
-    listRecipes:         () => fetchJSON('public/list/recipe'),
-    listPets:            () => fetchJSON('public/list/pet'),
-    listPetPassives:     () => fetchJSON('public/list/petPassive'),
-    listExpeditions:     () => fetchJSON('public/list/expedition'),
-    listExpeditionDrops: () => fetchJSON('public/list/expeditionDrop'),
-    listMasteries:       () => fetchJSON('public/list/mastery'),
-    listTraits:          () => fetchJSON('public/list/trait'),
-    listSkillSets:       () => fetchJSON('public/list/skillSet'),
-    getVersion:          () => fetchJSON('public/settings/version'),
+    // Single fetch returns the entire game-data bundle. Used by loadGameData.
+    fetchAllGameData: () => fetchGameData('all'),
+    // Per-type fetches kept available for ad-hoc use.
+    listSkills:          () => fetchGameData('skills'),
+    listActions:         () => fetchGameData('actions'),
+    listConversions:     () => fetchGameData('conversionActions'),
+    listItems:           () => fetchGameData('items'),
+    listDrops:           () => fetchGameData('drops'),
+    listIngredients:     () => fetchGameData('ingredients'),
+    listMonsters:        () => fetchGameData('monsters'),
+    listStructures:      () => fetchGameData('structures'),
+    listRecipes:         () => fetchGameData('recipes'),
+    listPets:            () => fetchGameData('pets'),
+    listPetPassives:     () => fetchGameData('petPassives'),
+    listExpeditions:     () => fetchGameData('expeditions'),
+    listExpeditionDrops: () => fetchGameData('expeditionDrops'),
+    listEnums:           () => fetchGameData('enums'),
+    getMeta:             () => fetchGameData('_meta'),
 
     // Authenticated endpoints (uses intercepted game token)
     getUser:             () => fetchAuth('getUser'),
