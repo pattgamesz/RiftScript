@@ -60,203 +60,198 @@ const TYPE_VALUATORS = {
             };
         },
     },
-    // Potion Mix is converted from used potions (6–34 mix per potion,
-    // scaling with tier and type). 27 source potions in total. Floor sits
-    // around ~5 g/mix after the in-game rebalance to 6+4n yields.
-    'Potion Mix': {
-        thresholds: { good: 6.0, neutral: 8.0 },
-        evaluate(item, listing) {
-            const conv = getTypeConversions('Potion Mix');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerMix = listing.price / amount;
-            return {
-                sortValue: gPerMix,
-                ratioChip: {
-                    text: `${gPerMix.toFixed(2)} g/mix`,
-                    className: thresholdClass(gPerMix, this.thresholds),
-                    title: 'Gold per potion mix yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} mix`,
-                    title: `${item.name} converts to ${amount} potion mix`,
-                },
-            };
-        },
-    },
-    // Research Points come from converting logbooks (1–8 points per book,
-    // scaling with tier from Beginner to Elite). Floor is exactly 4.00
-    // g/point across every logbook; thresholds bracket that baseline.
-    'Research Points': {
-        thresholds: { good: 6.0, neutral: 8.0 },
-        evaluate(item, listing) {
-            const conv = getTypeConversions('Research Points');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerPoint = listing.price / amount;
-            return {
-                sortValue: gPerPoint,
-                ratioChip: {
-                    text: `${gPerPoint.toFixed(2)} g/point`,
-                    className: thresholdClass(gPerPoint, this.thresholds),
-                    title: 'Gold per research point yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} point${amount === 1 ? '' : 's'}`,
-                    title: `${item.name} converts to ${amount} research point${amount === 1 ? '' : 's'}`,
-                },
-            };
-        },
-    },
-    // Sigil Pieces come from breaking down sigils (2–16 pieces per sigil,
-    // scaling with tier and type). Floor is exactly 14.00 g/piece across
-    // every sigil source; thresholds bracket that baseline.
-    'Sigil Pieces': {
-        thresholds: { good: 21.0, neutral: 28.0 },
-        evaluate(item, listing) {
-            const conv = getTypeConversions('Sigil Pieces');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerPiece = listing.price / amount;
-            return {
-                sortValue: gPerPiece,
-                ratioChip: {
-                    text: `${gPerPiece.toFixed(2)} g/piece`,
-                    className: thresholdClass(gPerPiece, this.thresholds),
-                    title: 'Gold per sigil piece yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} pieces`,
-                    title: `${item.name} breaks down into ${amount} sigil pieces`,
-                },
-            };
-        },
-    },
-    // Metal Parts are converted from smithed gear (2–24 parts per item,
-    // depending on tier and slot). 136 source items in total — too many to
-    // list manually, but the conv map handles it. Floor is exactly 16.00
-    // g/part across every source; thresholds bracket that baseline.
-    'Metal Parts': {
-        thresholds: { good: 24.0, neutral: 32.0 },
-        evaluate(item, listing) {
-            const conv = getTypeConversions('Metal Parts');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerPart = listing.price / amount;
-            return {
-                sortValue: gPerPart,
-                ratioChip: {
-                    text: `${gPerPart.toFixed(2)} g/part`,
-                    className: thresholdClass(gPerPart, this.thresholds),
-                    title: 'Gold per metal part yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} parts`,
-                    title: `${item.name} converts to ${amount} metal parts`,
-                },
-            };
-        },
-    },
-    // Pet Snacks are converted from raw fish at the pet feeder (1–8 snacks
-    // per fish, scaling with tier). Floor varies by fish — King Crab is the
-    // cheapest at 4.50 g/snack, Shrimp the most expensive at 8.00, so the
-    // sort naturally surfaces high-tier fish as the better deal.
-    'Pet Snacks': {
-        thresholds: { good: 5.0, neutral: 8.0 },
-        evaluate(item, listing) {
-            const conv = getTypeConversions('Pet Snacks');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerSnack = listing.price / amount;
-            return {
-                sortValue: gPerSnack,
-                ratioChip: {
-                    text: `${gPerSnack.toFixed(2)} g/snack`,
-                    className: thresholdClass(gPerSnack, this.thresholds),
-                    title: 'Gold per pet snack yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} snack${amount === 1 ? '' : 's'}`,
-                    title: `${item.name} converts to ${amount} pet snack${amount === 1 ? '' : 's'}`,
-                },
-            };
-        },
-    },
-    // Arcane Powder is converted from gems at the arcane crafter (50–400
-    // powder per gem, scaling with tier). Powder itself isn't tradeable —
-    // every listing is a gem source. Market floor is exactly 2.40 g/powder
-    // across every gem tier; thresholds bracket that baseline.
-    'Arcane Powder': {
-        thresholds: { good: 2.5, neutral: 4.0 },
-        evaluate(item, listing) {
-            const conv = getTypeConversions('Arcane Powder');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerPowder = listing.price / amount;
-            return {
-                sortValue: gPerPowder,
-                ratioChip: {
-                    text: `${gPerPowder.toFixed(2)} g/powder`,
-                    className: thresholdClass(gPerPowder, this.thresholds),
-                    title: 'Gold per arcane powder yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} powder`,
-                    title: `${item.name} converts to ${amount} arcane powder`,
-                },
-            };
-        },
-    },
-    // Compost is converted from fruits at the composter (20–160 compost per
-    // fruit). Market floor is 0.40 g/compost; thresholds bracket that.
-    'Compost': {
-        thresholds: { good: 0.5, neutral: 1.0 },
-        evaluate(item, listing) {
-            const conv = getTypeConversions('Compost');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerCompost = listing.price / amount;
-            return {
-                sortValue: gPerCompost,
-                ratioChip: {
-                    text: `${gPerCompost.toFixed(2)} g/compost`,
-                    className: thresholdClass(gPerCompost, this.thresholds),
-                    title: 'Gold per compost yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} compost`,
-                    title: `${item.name} converts to ${amount} compost at the composter`,
-                },
-            };
-        },
-    },
-    // Charcoal is converted from logs at the burner (1–8 charcoal per log,
-    // depending on tier). The Charcoal item itself can't be sold on the
-    // market — every listing is a log — so the value is gold per charcoal
-    // yielded after conversion. Floor is exactly 4.00 g/coal across every
-    // log tier; thresholds bracket that baseline.
+    // Charcoal is converted from logs at the burner (1–8 charcoal per log).
+    // The rift-guild API exposes the log→charcoal recipe set, so this one
+    // uses the conv lookup directly; everything else below ships with a
+    // hardcoded yield map since the API doesn't currently expose them.
     'Charcoal': {
         thresholds: { good: 10.0, neutral: 15.0 },
+        yieldOf(item) { return getTypeConversions('Charcoal')?.[item.id] || 0; },
+        match(item) { return this.yieldOf(item) > 0; },
         evaluate(item, listing) {
-            const conv = getTypeConversions('Charcoal');
-            const amount = conv?.[item.id];
-            if (!amount) return null;
-            const gPerCoal = listing.price / amount;
-            return {
-                sortValue: gPerCoal,
-                ratioChip: {
-                    text: `${gPerCoal.toFixed(2)} g/coal`,
-                    className: thresholdClass(gPerCoal, this.thresholds),
-                    title: 'Gold per charcoal yielded after conversion (lower = better deal)',
-                },
-                valueChip: {
-                    text: `${amount} coal`,
-                    title: `${item.name} converts to ${amount} charcoal at the burner`,
-                },
-            };
+            return buildConvChips(this, item, listing, {
+                unit: 'coal',
+                ratioUnit: 'g/coal',
+                ratioTitle: 'Gold per charcoal yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} converts to ${n} charcoal at the burner`,
+            });
+        },
+    },
+    // Compost — 8 fruits, hardcoded yields. Floor is 0.40 g/compost.
+    'Compost': {
+        thresholds: { good: 0.5, neutral: 1.0 },
+        yields: {
+            300: 20,  // Apple
+            301: 40,  // Grapes
+            302: 60,  // Cherry
+            303: 80,  // Green Apple
+            304: 100, // Blackcurrant
+            323: 120, // Raspberry
+            324: 140, // Blueberry
+            347: 160, // Banana
+        },
+        yieldOf(item) { return this.yields[item.id] || 0; },
+        match(item) { return this.yieldOf(item) > 0; },
+        evaluate(item, listing) {
+            return buildConvChips(this, item, listing, {
+                unit: 'compost',
+                ratioUnit: 'g/compost',
+                ratioTitle: 'Gold per compost yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} converts to ${n} compost at the composter`,
+            });
+        },
+    },
+    // Arcane Powder — 8 gems, hardcoded yields. Floor 2.40 g/powder.
+    'Arcane Powder': {
+        thresholds: { good: 2.5, neutral: 4.0 },
+        yields: {
+            30: 50,  31: 100, 32: 150, 33: 200,  // Ruby, Topaz, Emerald, Amethyst
+            35: 250, 34: 300, 36: 350, 37: 400,  // Citrine, Diamond, Moonstone, Onyx
+        },
+        yieldOf(item) { return this.yields[item.id] || 0; },
+        match(item) { return this.yieldOf(item) > 0; },
+        evaluate(item, listing) {
+            return buildConvChips(this, item, listing, {
+                unit: 'powder',
+                ratioUnit: 'g/powder',
+                ratioTitle: 'Gold per arcane powder yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} converts to ${n} arcane powder`,
+            });
+        },
+    },
+    // Pet Snacks — 8 raw fish, hardcoded yields. Floor varies by fish; high
+    // tier (King Crab 4.50 g/snack) is the better deal.
+    'Pet Snacks': {
+        thresholds: { good: 5.0, neutral: 8.0 },
+        yields: {
+            305: 1, 308: 2, 311: 3, 314: 4,  // Shrimp, Cod, Salmon, Bass
+            317: 5, 320: 6, 325: 7, 342: 8,  // Lobster, Swordfish, Shark, King Crab
+        },
+        yieldOf(item) { return this.yields[item.id] || 0; },
+        match(item) { return this.yieldOf(item) > 0; },
+        evaluate(item, listing) {
+            return buildConvChips(this, item, listing, {
+                unit: amount => `snack${amount === 1 ? '' : 's'}`,
+                ratioUnit: 'g/snack',
+                ratioTitle: 'Gold per pet snack yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} converts to ${n} pet snack${n === 1 ? '' : 's'}`,
+            });
+        },
+    },
+    // Sigil Pieces — 9 sigils, hardcoded yields. Floor 14.00 g/piece.
+    'Sigil Pieces': {
+        thresholds: { good: 21.0, neutral: 28.0 },
+        yields: {
+            1210: 2,  1211: 4,  1212: 6,   // Basic Power/Discovery/Wisdom
+            1213: 8,  1214: 10, 1215: 12,  // Regular Power/Discovery/Wisdom
+            1216: 14, 1217: 16, 1218: 16,  // Super Power/Discovery/Wisdom
+        },
+        yieldOf(item) { return this.yields[item.id] || 0; },
+        match(item) { return this.yieldOf(item) > 0; },
+        evaluate(item, listing) {
+            return buildConvChips(this, item, listing, {
+                unit: 'pieces',
+                ratioUnit: 'g/piece',
+                ratioTitle: 'Gold per sigil piece yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} breaks down into ${n} sigil pieces`,
+            });
+        },
+    },
+    // Research Points — 8 logbooks, hardcoded yields. Floor 4.00 g/point.
+    'Research Points': {
+        thresholds: { good: 6.0, neutral: 8.0 },
+        yields: {
+            1250: 1, 1251: 2, 1252: 3, 1253: 4,  // Beginner, Novice, Competent, Skilled
+            1254: 5, 1255: 6, 1256: 7, 1257: 8,  // Adept, Advanced, Expert, Elite
+        },
+        yieldOf(item) { return this.yields[item.id] || 0; },
+        match(item) { return this.yieldOf(item) > 0; },
+        evaluate(item, listing) {
+            return buildConvChips(this, item, listing, {
+                unit: amount => `point${amount === 1 ? '' : 's'}`,
+                ratioUnit: 'g/point',
+                ratioTitle: 'Gold per research point yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} converts to ${n} research point${n === 1 ? '' : 's'}`,
+            });
+        },
+    },
+    // Metal Parts — 136 smithed-gear sources. Floor is exactly 16 g/part for
+    // every source, so the yield can be derived: minMarketPrice / 16. Body
+    // pieces give 3 parts per tier, tools/other slots give 2 parts per tier.
+    'Metal Parts': {
+        thresholds: { good: 24.0, neutral: 32.0 },
+        yieldOf(item) {
+            if (!isSmithedGearItem(item)) return 0;
+            const mm = item.attributes?.MIN_MARKET_PRICE || 0;
+            return Math.round(mm / 16);
+        },
+        match(item) { return this.yieldOf(item) > 0; },
+        evaluate(item, listing) {
+            return buildConvChips(this, item, listing, {
+                unit: 'parts',
+                ratioUnit: 'g/part',
+                ratioTitle: 'Gold per metal part yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} converts to ${n} metal parts`,
+            });
+        },
+    },
+    // Potion Mix — every tradeable potion converts. Floor is exactly 4 g/mix,
+    // so yield can be derived from minMarketPrice. 6+4n in-game formula.
+    'Potion Mix': {
+        thresholds: { good: 6.0, neutral: 8.0 },
+        yieldOf(item) {
+            if (!isPotion(item)) return 0;
+            const mm = item.attributes?.MIN_MARKET_PRICE || 0;
+            const y = Math.round(mm / 4);
+            return y >= 6 ? y : 0;
+        },
+        match(item) { return this.yieldOf(item) > 0; },
+        evaluate(item, listing) {
+            return buildConvChips(this, item, listing, {
+                unit: 'mix',
+                ratioUnit: 'g/mix',
+                ratioTitle: 'Gold per potion mix yielded after conversion (lower = better deal)',
+                valueTitle: (n, name) => `${name} converts to ${n} potion mix`,
+            });
         },
     },
 };
+
+// Shared chip builder for every conversion-style valuator — every entry
+// computes the same `gold/yield-unit` ratio with the same chip layout.
+function buildConvChips(valuator, item, listing, cfg) {
+    const amount = valuator.yieldOf(item);
+    if (!amount) return null;
+    const gPer = listing.price / amount;
+    const unitLabel = typeof cfg.unit === 'function' ? cfg.unit(amount) : cfg.unit;
+    return {
+        sortValue: gPer,
+        ratioChip: {
+            text: `${gPer.toFixed(2)} ${cfg.ratioUnit}`,
+            className: thresholdClass(gPer, valuator.thresholds),
+            title: cfg.ratioTitle,
+        },
+        valueChip: {
+            text: `${amount} ${unitLabel}`,
+            title: cfg.valueTitle(amount, item.name),
+        },
+    };
+}
+
+// Smithed gear name pattern — used by the Metal Parts valuator. Always two
+// words (Tier + Slot); upgraded gear uses 3+ words (Superior / Exquisite /
+// Perfect prefix), so excluding non-2-word names skips upgrades cleanly.
+const METAL_TIERS = new Set(['Copper','Iron','Silver','Gold','Cobalt','Obsidian','Astral','Infernal']);
+const METAL_SLOTS = new Set([
+    'Helmet','Body','Boots','Gloves','Shield',
+    'Sword','Hammer','Pickaxe','Hatchet','Spear','Bow','Scythe','Boomerang',
+    'Rod','Spade','Compass','Lantern',
+]);
+function isSmithedGearItem(item) {
+    const parts = (item?.name || '').split(' ');
+    if (parts.length !== 2) return false;
+    return METAL_TIERS.has(parts[0]) && METAL_SLOTS.has(parts[1]);
+}
 
 // Tribute filters — group multiple item categories, no per-item value sort.
 const FLOWERS = new Set(['Daisy', 'Hyacinth', 'Lilac', 'Nemesia', 'Peony', 'Rose', 'Snapdragon', 'Tulip']);
