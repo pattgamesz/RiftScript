@@ -304,19 +304,23 @@ function buildTributeValuator(name) {
     return {
         thresholds: { good: 1.5, neutral: 2.5 },
         evaluate(item, listing) {
-            const value = item.attributes?.SELL_PRICE || 0;
-            if (!value) return null;
-            const ratio = listing.price / value;
+            // Pull straight from the API's `price` field (mapped onto our
+            // SELL_PRICE attribute in data.js). That price is what the game
+            // values each item at, and tribute contributions scale with it
+            // in-game, so it's the right proxy for tribute weight.
+            const price = item.attributes?.SELL_PRICE || 0;
+            if (!price) return null;
+            const ratio = listing.price / price;
             return {
                 sortValue: ratio,
                 ratioChip: {
                     text: `${ratio.toFixed(2)}x`,
                     className: thresholdClass(ratio, this.thresholds),
-                    title: 'Listing price ÷ vendor value (lower = better deal per tribute point)',
+                    title: 'Listing price ÷ item price (lower = better deal per tribute point)',
                 },
                 valueChip: {
-                    text: `${formatNumber(value)} value`,
-                    title: `Vendor sell price — used as the ${name} tribute value of this item`,
+                    text: `${formatNumber(price)} price`,
+                    title: `Item price from the game data — used as the ${name} tribute weight`,
                 },
             };
         },
@@ -732,21 +736,14 @@ function applyFilter(patch) {
     Object.assign(currentFilter, patch);
     writeJSON(CURRENT_KEY, currentFilter);
 
-    // Update the in-game search box to match the active filter — fill it
-    // with the names of every item the filter would keep so the game's
-    // native search narrows the listings before we layer chips on top.
+    // Update the in-game search box to match the active filter. Tributes
+    // skip the regex injection — Mountain alone has ~160 alternatives
+    // (smithed gear + bars + ore + crystals + bones), and switching
+    // between tributes with strings that long crashes the game's filter.
+    // The client-side matcher in applyToListings + valuator chips keep
+    // the visual behaviour intact without poking the game's filter.
     if (currentFilter.tribute && TRIBUTES[currentFilter.tribute]) {
-        const items = getTributeMatchingItems(currentFilter.tribute);
-        if (items?.length) {
-            const names = items
-                .map(i => i.name)
-                .filter(Boolean)
-                .map(n => `^${escapeRegex(n)}`)
-                .join('|');
-            setMarketSearch(names);
-        } else {
-            setMarketSearch('');
-        }
+        setMarketSearch('');
     } else if (currentFilter.type && currentFilter.type !== 'None') {
         const items = getTypeMatchingItems(currentFilter.type);
         if (items?.length) {
