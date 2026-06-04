@@ -193,31 +193,48 @@ async function readPetScreen() {
                     events.emit('reader-pet', pets);
                 }
             }).catch(() => { /* swallow — sync fallback already emitted */ });
-        } else if (lastPets.length) {
-            // DOM has no pet rows we recognise, or we're on a non-Pets sub-tab.
-            // Re-emit the last good scrape so the expedition calc keeps its data.
-            events.emit('reader-pet', lastPets);
         } else {
-            // No prior scrape — first load on a sub-tab without pet rows.
-            // Reconstruct from API so the expedition calc has team data.
-            const apiPets = await getApiPets();
-            if (apiPets?.length) {
-                const reconstructed = apiPets.map(ap => {
-                    const species = data.pets?.byId?.[ap.species];
-                    return {
-                        species: ap.species,
-                        family: species?.family,
-                        name: ap.name,
-                        level: ap.level,
-                        location: knownTeamNames.has(ap.name) ? 'team' : 'collection',
-                        groupIndex: 0,
-                        element: $(),
-                        apiId: ap.id,
-                        apiStats: ap,
-                    };
-                });
-                lastPets = reconstructed;
-                events.emit('reader-pet', reconstructed);
+            // Non-Pets sub-tab. The Expedition / Breeding sub-tabs do show pet
+            // rows (the 3 team pets), but without the Ranch+Team headers our
+            // is-Pets-sub-tab check needs. Use those visible rows to bootstrap
+            // knownTeamNames so the Expedition calc has the right team even on
+            // a cold first load when the user's saved default sub-tab IS
+            // Expedition and they've never visited the Pets sub-tab this
+            // session.
+            if (pets.length) {
+                knownTeamNames = new Set(pets.map(p => p.name));
+                saveKnownTeamNames();
+            }
+
+            if (lastPets.length) {
+                // Re-emit the last good scrape so the expedition calc keeps
+                // its data.
+                events.emit('reader-pet', lastPets);
+            } else {
+                // No prior scrape — first load on a sub-tab without a full
+                // pets list. Reconstruct from API so the expedition calc
+                // has team data; team membership is sourced from
+                // knownTeamNames (which we may have just bootstrapped above
+                // from the visible Expedition Team rows).
+                const apiPets = await getApiPets();
+                if (apiPets?.length) {
+                    const reconstructed = apiPets.map(ap => {
+                        const species = data.pets?.byId?.[ap.species];
+                        return {
+                            species: ap.species,
+                            family: species?.family,
+                            name: ap.name,
+                            level: ap.level,
+                            location: knownTeamNames.has(ap.name) ? 'team' : 'collection',
+                            groupIndex: 0,
+                            element: $(),
+                            apiId: ap.id,
+                            apiStats: ap,
+                        };
+                    });
+                    lastPets = reconstructed;
+                    events.emit('reader-pet', reconstructed);
+                }
             }
         }
     } catch (e) {

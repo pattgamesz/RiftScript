@@ -59,6 +59,20 @@ export function initPetFilter() {
     panelPoller = pollUntilDone(() => {
         if (!$('taming-page').length) return false; // left taming → stop
         if (!$(`#${PANEL_ID}`).length) ensurePanel();
+        // Re-trigger the pet reader if any visible row is missing our
+        // rs-pet-processed marker. Angular wipes that class whenever it
+        // re-renders the row (level-up, breed, equipment swap, feed action)
+        // — WaterFox / Firefox forks hit this more often than Chrome because
+        // their Angular zone flushes the row's children rather than just the
+        // changed attributes. Cheap check; trigger is debounced via the
+        // inProgress flag in petReader so this won't stampede.
+        const rows = document.querySelectorAll('taming-page button.row');
+        for (const row of rows) {
+            if (!row.classList.contains('rs-pet-processed')) {
+                triggerPetReader();
+                break;
+            }
+        }
         // Keep polling — the user can still switch sub-tabs and lose the panel.
     }, 1000);
 
@@ -468,6 +482,10 @@ function decoratePet(pet, ctx) {
     $el.removeClass('rs-pet-duplicate rs-pet-best rs-pet-release-row');
     $el.find('.rs-pet-chip, .rs-pet-best-star, .rs-pet-additions, .rs-pet-release').remove();
     $el.find('.tags > *').removeClass('rs-pet-chip-best-perfect');
+    // Mark the row so the panelPoller can tell whether the game has re-
+    // rendered it (level-up, breed, equipment change wipe our injected
+    // children). A row missing this class on a poll tick → re-trigger.
+    $el.addClass('rs-pet-processed');
 
     // Family filter applies only to the main collection
     if (pet.location === 'collection') {
