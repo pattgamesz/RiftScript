@@ -297,6 +297,39 @@ const TRIBUTES = {
     },
 };
 
+// Tribute filters use the item's vendor sell price (`price` in the API)
+// as the per-item tribute value, since tributes generally scale with item
+// value in-game. Listings sort by listing price ÷ vendor value — lower is
+// a better deal per tribute point contributed. Thresholds match what the
+// best-deal filters use as their default vendor ratio.
+function buildTributeValuator(name) {
+    return {
+        thresholds: { good: 1.5, neutral: 2.5 },
+        evaluate(item, listing) {
+            const value = item.attributes?.SELL_PRICE || 0;
+            if (!value) return null;
+            const ratio = listing.price / value;
+            return {
+                sortValue: ratio,
+                ratioChip: {
+                    text: `${ratio.toFixed(2)}x`,
+                    className: thresholdClass(ratio, this.thresholds),
+                    title: 'Listing price ÷ vendor value (lower = better deal per tribute point)',
+                },
+                valueChip: {
+                    text: `${formatNumber(value)} value`,
+                    title: `Vendor sell price — used as the ${name} tribute value of this item`,
+                },
+            };
+        },
+    };
+}
+const TRIBUTE_VALUATORS = {
+    'Forest': buildTributeValuator('Forest'),
+    'Mountain': buildTributeValuator('Mountain'),
+    'Ocean': buildTributeValuator('Ocean'),
+};
+
 let activeTab = 'filter';
 let riftMode = 'highlight';
 let savedFilters = [];
@@ -774,7 +807,8 @@ function applyToListings(marketData) {
 // Decorates kept listings with value + ratio chips, hides the rest, reorders by sort value,
 // and returns the kept listings (possibly empty).
 function filterByMembership(marketData, match) {
-    const valuator = TYPE_VALUATORS[currentFilter.type];
+    const valuator = TYPE_VALUATORS[currentFilter.type]
+        || TRIBUTE_VALUATORS[currentFilter.tribute];
     const matching = [];
     for (const l of marketData.listings) {
         const item = data.items?.byId?.[l.item];
