@@ -267,7 +267,10 @@ const isFlower = i => FLOWERS.has(i.name);
 const isVegetable = i => VEGETABLES.has(i.name);
 const isLog = i => / Log$/.test(i.name);
 const isLogbook = i => i.name.includes('Logbook');
-const isSmithed = i => SMITHED_SKILLS.has(i.skill) && i.tier > 0 && i.name.split(' ').length === 2;
+// Smithed gear has a 2-word name with a known Tier + Slot — reuse the
+// Metal-Parts valuator's check so the two stay in sync. Doesn't depend on
+// the (now-numeric) item.skill field.
+const isSmithed = i => isSmithedGearItem(i);
 const isBar = i => / Bar$/.test(i.name);
 const isOre = i => / Ore$/.test(i.name);
 const isCrystal = i => / Crystal$/.test(i.name);
@@ -432,6 +435,14 @@ function getTypeMatchingItems(typeKey) {
             .filter(Boolean);
     }
     return null;
+}
+
+// Same idea for tributes: filter the item list through the tribute's match
+// predicate so applyFilter can type the names into the game's search box.
+function getTributeMatchingItems(tributeKey) {
+    const tribute = TRIBUTES[tributeKey];
+    if (!tribute?.match || !data.items?.list) return null;
+    return data.items.list.filter(i => tribute.match(i));
 }
 
 // ─── Panel ──────────────────────────────────────────────────
@@ -721,12 +732,21 @@ function applyFilter(patch) {
     Object.assign(currentFilter, patch);
     writeJSON(CURRENT_KEY, currentFilter);
 
-    // Update the in-game search box to match the active filter.
-    // For tributes we skip the regex injection — our client-side matcher in
-    // applyToListings handles hiding, and the regex was big enough (~120
-    // alternatives for Mountain) to occasionally crash the game's filter.
+    // Update the in-game search box to match the active filter — fill it
+    // with the names of every item the filter would keep so the game's
+    // native search narrows the listings before we layer chips on top.
     if (currentFilter.tribute && TRIBUTES[currentFilter.tribute]) {
-        setMarketSearch('');
+        const items = getTributeMatchingItems(currentFilter.tribute);
+        if (items?.length) {
+            const names = items
+                .map(i => i.name)
+                .filter(Boolean)
+                .map(n => `^${escapeRegex(n)}`)
+                .join('|');
+            setMarketSearch(names);
+        } else {
+            setMarketSearch('');
+        }
     } else if (currentFilter.type && currentFilter.type !== 'None') {
         const items = getTypeMatchingItems(currentFilter.type);
         if (items?.length) {
