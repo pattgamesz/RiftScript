@@ -319,7 +319,7 @@ function buildTributeValuator(name) {
                     title: 'Listing price ÷ item price (lower = better deal per tribute point)',
                 },
                 valueChip: {
-                    text: `${formatNumber(price)} price`,
+                    text: `${formatNumber(price)} tribute`,
                     title: `Item price from the game data — used as the ${name} tribute weight`,
                 },
             };
