@@ -216,55 +216,61 @@ async function readPetScreen() {
                     events.emit('reader-pet', pets);
                 }
             }).catch(() => { /* swallow — sync fallback already emitted */ });
-        } else if (pets.length) {
-            // Non-Pets sub-tab WITH visible pet rows — that's the Expedition
-            // or Breeding sub-tab showing the 3 team pets. Use the scraped
-            // rows directly so the expedition calc has team data without
-            // needing the API name to round-trip through knownTeamNames.
-            // Don't replace lastPets with this partial list (it has no
-            // collection / ranch rows) — keep that as the authoritative
-            // source for the Pets sub-tab view.
-            const groupCounters = {};
-            for (const p of pets) {
-                const k = `${p.name}|${p.species}|${p.level}`;
-                p.groupIndex = (groupCounters[k] || 0);
-                groupCounters[k] = p.groupIndex + 1;
-            }
-            const teamFromScrape = pets.filter(p => p.location === 'team').map(p => p.name);
-            if (teamFromScrape.length) {
-                knownTeamNames = new Set(teamFromScrape);
-                saveKnownTeamNames();
-            }
-            // Hot-path enrichment, then emit.
-            enrichPetsWithApi(pets, getApiPetsSync());
-            // If we already have a full-collection cache, merge the
-            // freshly-scraped team rows over it so the panel still sees
-            // every pet. Otherwise emit the partial list — it covers the
-            // expedition calc's needs.
-            const merged = lastPets.length
-                ? mergeTeamIntoLastPets(lastPets, pets)
-                : pets;
-            events.emit('reader-pet', merged);
-
-            // Background API enrichment for the partial list too.
-            getApiPets().then(apiPets => {
-                if (enrichPetsWithApi(pets, apiPets)) {
-                    events.emit('reader-pet', lastPets.length
-                        ? mergeTeamIntoLastPets(lastPets, pets)
-                        : pets);
-                }
-            }).catch(() => { /* swallow */ });
         } else {
+            // Non-Pets sub-tab. The Expedition / Breeding sub-tabs show the
+            // 3 team pets but without the Ranch+Team headers our
+            // is-Pets-sub-tab check needs. Persist team names from the visible
+            // rows (so a cold load on Expedition still knows the team), then
+            // fall through to re-emit lastPets (if any) or reconstruct from
+            // API. Don't replace lastPets with the partial scrape.
+            if (pets.length) {
+                const teamNames = pets
+                    .filter(p => p.location === 'team')
+                    .map(p => p.name);
+                if (teamNames.length) {
+                    knownTeamNames = new Set(teamNames);
+                    saveKnownTeamNames();
+                }
+            }
+
             if (lastPets.length) {
-                // Re-emit the last good scrape so the expedition calc keeps
-                // its data.
+                // Update lastPets in place so any newly-scraped team rows
+                // override the previous team membership before re-emitting.
+                for (const lp of lastPets) {
+                    if (lp.location === 'team') lp.location = 'collection';
+                }
+                for (const sp of pets.filter(p => p.location === 'team')) {
+                    const match = lastPets.find(p =>
+                        p.name === sp.name && p.species === sp.species
+                    );
+                    if (match) {
+                        match.location = 'team';
+                        match.element = sp.element;
+                    }
+                }
                 events.emit('reader-pet', lastPets);
+            } else if (pets.length) {
+                // No prior full-collection cache, but the Expedition Team
+                // card is visible — emit those scraped rows directly so the
+                // expedition calc gets its team. The Pets sub-tab will fill
+                // in the rest when the user visits it.
+                const groupCounters = {};
+                for (const p of pets) {
+                    const k = `${p.name}|${p.species}|${p.level}`;
+                    p.groupIndex = (groupCounters[k] || 0);
+                    groupCounters[k] = p.groupIndex + 1;
+                }
+                enrichPetsWithApi(pets, getApiPetsSync());
+                events.emit('reader-pet', pets);
+                getApiPets().then(apiPets => {
+                    if (enrichPetsWithApi(pets, apiPets)) {
+                        events.emit('reader-pet', pets);
+                    }
+                }).catch(() => { /* swallow */ });
             } else {
-                // No prior scrape — first load on a sub-tab without a full
-                // pets list. Reconstruct from API so the expedition calc
-                // has team data; team membership is sourced from
-                // knownTeamNames (which we may have just bootstrapped above
-                // from the visible Expedition Team rows).
+                // No prior scrape AND no visible pet rows. Reconstruct from
+                // the API; team membership is sourced from knownTeamNames
+                // (loaded from localStorage on init).
                 const apiPets = await getApiPets();
                 if (apiPets?.length) {
                     const reconstructed = apiPets.map(ap => {
