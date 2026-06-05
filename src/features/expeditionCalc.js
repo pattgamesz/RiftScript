@@ -141,8 +141,23 @@ function passiveValue(passive) {
     return found?.statValue || 0;
 }
 
+// getUser's pet.species could be a numeric species id, the species name,
+// or the technicalName depending on the upstream shape. Old code only
+// checked byId, which now misses the rift-guild adapter's null-id pets and
+// any name-based references. Try every index we maintain on data.pets.
+function lookupSpecies(pet) {
+    if (pet?.species == null) return null;
+    const idx = data.pets;
+    if (!idx) return null;
+    return idx.byId?.[pet.species]
+        || idx.bySpecies?.[pet.species]
+        || idx.byTechnicalName?.[pet.species]
+        || idx.byName?.[pet.species]
+        || null;
+}
+
 function petToStats(pet) {
-    const species = data.pets?.byId?.[pet.species];
+    const species = lookupSpecies(pet);
     if (!species) return null;
     const cached = pet.apiStats || getPetStats(pet);
     if (!cached || cached.health == null) return null;

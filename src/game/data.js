@@ -448,6 +448,9 @@ function processRawData(raw) {
     data.pets = {
         list: pets,
         byId: indexBy(pets, 'id'),
+        byName: indexBy(pets, 'name'),
+        byTechnicalName: indexBy(pets, 'technicalName'),
+        bySpecies: indexBy(pets, 'species'),
         byImage: petsByImage,
     };
 
