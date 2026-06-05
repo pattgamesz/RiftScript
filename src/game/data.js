@@ -314,10 +314,14 @@ function processRawData(raw) {
     const allActions = [...skillActions, ...conversionActions];
     const monsters = (raw.monsters || []).map(adaptMonster);
     const structures = (raw.structures || []).map(adaptStructure);
-    const pets = (raw.pets || []).map(adaptPet);
-    const petPassives = (raw.petPassives || []).map(adaptPetPassive);
-    const expeditions = (raw.expeditions || []).map(adaptExpedition);
-    const expeditionDrops = (raw.expeditionDrops || []).map(adaptExpeditionDrop);
+    // Pets / petPassives / expeditions / expeditionDrops come from the
+    // self-hosted Pancake JSON already in the expected shape — pass them
+    // through unchanged so expeditionCalc + petReader read the same fields
+    // they always have.
+    const pets = raw.pets || [];
+    const petPassives = raw.petPassives || [];
+    const expeditions = raw.expeditions || [];
+    const expeditionDrops = raw.expeditionDrops || [];
 
     // Drops + ingredients are reconstructed from the embedded materials/drops
     // arrays on actions + conversionActions. The /drops endpoint covers
@@ -479,7 +483,18 @@ function processRawData(raw) {
 }
 
 async function fetchFresh() {
-    return api.fetchAllGameData();
+    // /all bundles items/actions/conversions/drops/ingredients/monsters/
+    // skills/structures from the rift-guild API. Pets + expeditions are
+    // still self-hosted because the rift-guild extraction doesn't carry
+    // power / exp / food / abilityName1/2 — see api.js fetchHosted note.
+    const [bundle, pets, petPassives, expeditions, expeditionDrops] = await Promise.all([
+        api.fetchAllGameData(),
+        api.listPets().catch(() => []),
+        api.listPetPassives().catch(() => []),
+        api.listExpeditions().catch(() => []),
+        api.listExpeditionDrops().catch(() => []),
+    ]);
+    return { ...bundle, pets, petPassives, expeditions, expeditionDrops };
 }
 
 export async function loadGameData() {
