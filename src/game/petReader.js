@@ -65,6 +65,32 @@ function getApiPetsSync() {
     return resp ? extractPetsFromUser(resp) : null;
 }
 
+// Build a single reconstructed pet object from a getUser entry, overlaying
+// any matching DOM-scraped row's fresh location / element / groupIndex
+// when one exists. Tries every available index on data.pets so the species
+// lookup doesn't depend on which key shape getUser happens to use.
+function buildReconstructedPet(ap, scrapedPets = []) {
+    const scraped = scrapedPets.find(p => p.name === ap.name);
+    const idx = data.pets || {};
+    const species = idx.byId?.[ap.species]
+        || idx.bySpecies?.[ap.species]
+        || idx.byTechnicalName?.[ap.species]
+        || idx.byName?.[ap.species]
+        || null;
+    return {
+        species: ap.species,
+        family: species?.family,
+        name: ap.name,
+        level: scraped?.level ?? ap.level,
+        location: scraped?.location
+            || (knownTeamNames.has(ap.name) ? 'team' : 'collection'),
+        groupIndex: scraped?.groupIndex ?? 0,
+        element: scraped?.element || $(),
+        apiId: ap.id,
+        apiStats: ap,
+    };
+}
+
 async function getApiPets() {
     const resp = await getUser();
     if (!resp) return null;
@@ -253,46 +279,57 @@ async function readPetScreen() {
                 // sub-tab visit. Re-emit it as-is — going to Expedition /
                 // Breeding and back to Pets must not touch team membership.
                 events.emit('reader-pet', lastPets);
-            } else if (pets.length) {
-                // No prior full-collection cache, but the Expedition Team
-                // card is visible — emit those scraped rows directly so the
-                // expedition calc gets its team. The Pets sub-tab will fill
-                // in the rest when the user visits it.
-                const groupCounters = {};
-                for (const p of pets) {
-                    const k = `${p.name}|${p.species}|${p.level}`;
-                    p.groupIndex = (groupCounters[k] || 0);
-                    groupCounters[k] = p.groupIndex + 1;
-                }
-                enrichPetsWithApi(pets, getApiPetsSync());
-                events.emit('reader-pet', pets);
-                getApiPets().then(apiPets => {
-                    if (enrichPetsWithApi(pets, apiPets)) {
-                        events.emit('reader-pet', pets);
-                    }
-                }).catch(() => { /* swallow */ });
             } else {
-                // No prior scrape AND no visible pet rows. Reconstruct from
-                // the API; team membership is sourced from knownTeamNames
-                // (loaded from localStorage on init).
-                const apiPets = await getApiPets();
-                if (apiPets?.length) {
-                    const reconstructed = apiPets.map(ap => {
-                        const species = data.pets?.byId?.[ap.species];
-                        return {
-                            species: ap.species,
-                            family: species?.family,
-                            name: ap.name,
-                            level: ap.level,
-                            location: knownTeamNames.has(ap.name) ? 'team' : 'collection',
-                            groupIndex: 0,
-                            element: $(),
-                            apiId: ap.id,
-                            apiStats: ap,
-                        };
-                    });
+                // Sync-first reconstruction from the userCache. Cold refresh
+                // on the Expedition sub-tab hits this — every piece of data
+                // the expedition calc needs is already in localStorage:
+                //   - userCache (the getUser response, hydrated synchronously)
+                //   - knownTeamNames (loaded on init for team membership)
+                //   - petStats (looked up by apiId by applyToList downstream)
+                //   - data.pets (indexed for species lookup)
+                // No network roundtrip needed for the initial emit.
+                const syncApiPets = getApiPetsSync();
+                if (syncApiPets?.length) {
+                    const reconstructed = syncApiPets.map(ap => buildReconstructedPet(ap, pets));
                     lastPets = reconstructed;
                     events.emit('reader-pet', reconstructed);
+
+                    // Background refresh — only re-emit if the new fetch
+                    // brought back a different number of pets (handles new
+                    // hatch / release between sessions).
+                    getApiPets().then(fresh => {
+                        if (fresh?.length && fresh.length !== syncApiPets.length) {
+                            const refreshed = fresh.map(ap => buildReconstructedPet(ap, pets));
+                            lastPets = refreshed;
+                            events.emit('reader-pet', refreshed);
+                        }
+                    }).catch(() => { /* swallow */ });
+                } else if (pets.length) {
+                    // No cache at all (first run after install) but visible
+                    // team rows exist on the Expedition sub-tab — use those.
+                    const groupCounters = {};
+                    for (const p of pets) {
+                        const k = `${p.name}|${p.species}|${p.level}`;
+                        p.groupIndex = (groupCounters[k] || 0);
+                        groupCounters[k] = p.groupIndex + 1;
+                    }
+                    events.emit('reader-pet', pets);
+                    // Fetch in the background to enrich with apiStats.
+                    getApiPets().then(fresh => {
+                        if (fresh?.length) {
+                            const reconstructed = fresh.map(ap => buildReconstructedPet(ap, pets));
+                            lastPets = reconstructed;
+                            events.emit('reader-pet', reconstructed);
+                        }
+                    }).catch(() => {});
+                } else {
+                    // Truly cold (no cache, no DOM rows) — wait for the API.
+                    const apiPets = await getApiPets();
+                    if (apiPets?.length) {
+                        const reconstructed = apiPets.map(ap => buildReconstructedPet(ap, pets));
+                        lastPets = reconstructed;
+                        events.emit('reader-pet', reconstructed);
+                    }
                 }
             }
         }
