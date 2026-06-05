@@ -198,22 +198,29 @@ function adaptStructure(raw, index) {
 }
 
 function adaptPet(raw, index) {
+    // The expedition calc reads abilityName1/Value1/Name2/Value2 (legacy
+    // Pancake shape). Flatten the new API's abilities dict back to that
+    // pair so the calc keeps working without touching its module.
+    const abilityEntries = Object.entries(raw.abilities || {});
     return {
         id: raw.id != null ? parseId(raw.id) : -(index + 1),
         name: raw.displayName || raw.technicalName || '',
         technicalName: raw.technicalName,
         displayName: raw.displayName,
         species: raw.species,
-        // The API doesn't expose a 'family' — group same-tier species together
-        // by the first ability key as a best-effort proxy. PetReader matches
-        // by species image elsewhere, so the family field is only used as a
-        // filter label and survives a rough grouping.
         family: deriveFamily(raw),
         image: raw.image,
         tier: raw.tier,
         stats: raw.stats,
         abilities: raw.abilities,
         evolve: raw.evolve,
+        // Legacy fields the expedition calc reads.
+        // Pet power scales linearly with tier: 100/150/200/…
+        power: raw.stats?.health ?? (50 + 50 * (raw.tier || 1)),
+        abilityName1: abilityEntries[0]?.[0] || null,
+        abilityValue1: abilityEntries[0]?.[1] || 0,
+        abilityName2: abilityEntries[1]?.[0] || null,
+        abilityValue2: abilityEntries[1]?.[1] || 0,
     };
 }
 
@@ -240,15 +247,35 @@ function adaptPetPassive(raw, index) {
     };
 }
 
+// Expedition game-constants the rift-guild API doesn't expose yet (name,
+// power, exp, food). Keyed by level (1, 10, 25, …) to match the technicalName
+// suffix. Stable across game patches; bump when the in-game numbers change.
+const EXPEDITION_META = {
+    1:   { name: 'Mistwood Grove',     power: 30,  exp: 957,  food: 50  },
+    10:  { name: 'Silverfall Canyon',  power: 66,  exp: 1231, food: 75  },
+    25:  { name: 'Thunderpeak Summit', power: 122, exp: 1504, food: 100 },
+    40:  { name: 'Darkwater Marsh',    power: 262, exp: 1821, food: 112 },
+    55:  { name: 'Sunfire Plateau',    power: 356, exp: 2160, food: 124 },
+    70:  { name: 'Frostfang Vale',     power: 605, exp: 2515, food: 136 },
+    85:  { name: 'Starlight Grotto',   power: 743, exp: 2880, food: 148 },
+    100: { name: 'Shadowmist Hollow',  power: 930, exp: 3297, food: 160 },
+};
+
 function adaptExpedition(raw, index) {
-    // technicalName like "Expedition10" — strip prefix for tier (10).
+    // technicalName like "Expedition10" — strip prefix to get the level (10).
     const m = (raw.technicalName || '').match(/Expedition(\d+)/);
-    const tier = m ? +m[1] : (index + 1);
+    const level = m ? +m[1] : (index + 1);
+    const meta = EXPEDITION_META[level] || {};
     return {
-        id: raw.id != null ? parseId(raw.id) : -(index + 1),
-        name: raw.displayName || raw.technicalName || '',
+        // id = the level number (1, 10, 25…) so it matches the expeditionDrop
+        // lookup AND the rotation/tier indexing the calc does (tier 1..8).
+        id: level,
+        name: meta.name || raw.displayName || raw.technicalName || '',
         technicalName: raw.technicalName,
-        tier,
+        tier: index + 1,
+        power: meta.power || 0,
+        exp: meta.exp || 0,
+        food: meta.food || 0,
         // Each category (wood/ore/flowers/…) is an array of {id, ratio}; pass
         // through so consumers can read them as-is.
         categories: {
@@ -259,10 +286,20 @@ function adaptExpedition(raw, index) {
 }
 
 function adaptExpeditionDrop(raw) {
+    // expeditionTechnicalName like "Expedition10" — same level extraction as
+    // adaptExpedition so byExpedition[10] = drops from Expedition10.
+    const m = (raw.expeditionTechnicalName || '').match(/Expedition(\d+)/);
+    const expId = m ? +m[1]
+        : (raw.expeditionId != null ? parseId(raw.expeditionId) : null);
     return {
-        expedition: raw.expeditionId != null ? parseId(raw.expeditionId) : raw.expeditionTechnicalName,
+        expedition: expId,
+        // Alias category → type so the legacy expeditionCalc lookups keep
+        // working (it reads drop.type).
+        type: raw.category,
         category: raw.category,
         item: parseId(raw.itemId),
+        // Same alias for ratio → amount.
+        amount: raw.ratio,
         ratio: raw.ratio,
     };
 }
