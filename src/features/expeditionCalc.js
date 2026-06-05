@@ -157,26 +157,52 @@ function lookupSpecies(pet) {
 }
 
 function petToStats(pet) {
-    const species = lookupSpecies(pet);
-    if (!species) return null;
-    const cached = pet.apiStats || getPetStats(pet);
+    // Cache is the source of truth — every field below comes from it.
+    // Prefer the modal-scraped petStats entry (stats stored as roll
+    // percentages, which the formula expects) over the getUser apiStats
+    // (which exposes the actual numeric HP/ATK/DEF and would feed wildly
+    // wrong numbers into the percentage-based formula).
+    // Species template is optional: when the rift-guild API doesn't expose
+    // an id for a pet (some tier-1 species are id:null and aren't in the
+    // SI enum), the lookup misses and we fall back to what the cache and
+    // pet.tier give us directly.
+    const cached = getPetStats(pet) || pet.apiStats;
     if (!cached || cached.health == null) return null;
+    const species = lookupSpecies(pet);
+
     const lvl = pet.level || cached.level || 1;
+    const tier = pet.tier || cached.tier || species?.tier || 1;
+    // Pet power scales linearly with tier: 100 / 150 / 200 / …
+    const power = species?.power ?? (50 + 50 * tier);
+
     const out = {};
     for (const k of ['health', 'attack', 'defense']) {
         const raw = +(cached[k] || 0);
-        out[k] = (species.power + raw / 2 - 10) / 100 * lvl + 10;
+        out[k] = (power + raw / 2 - 10) / 100 * lvl + 10;
     }
     for (const k of ['meleeDefense', 'rangedDefense', 'magicDefense', 'meleeAttack', 'rangedAttack', 'magicAttack', 'hunger', 'itemFind', 'eggFind']) {
         out[k] = 0;
     }
-    // Species abilities (bones / fish / flowers / ore / veges / wood / crystals
-    // / logbooks) — these are what drives expedition drop amounts.
+    // Species abilities (bones / fish / flowers / ore / veges / wood /
+    // crystals / logbooks) drive expedition drop amounts. Pull them from
+    // the species template if we have one, otherwise the cached entry has
+    // them too (saved at modal-scrape time as either a dict or an array).
     for (const k of ['bones', 'fish', 'flowers', 'ore', 'veges', 'wood', 'crystals', 'logbooks']) {
         out[k] = 0;
     }
-    if (species.abilityName1) out[species.abilityName1] = (out[species.abilityName1] || 0) + (species.abilityValue1 || 0);
-    if (species.abilityName2) out[species.abilityName2] = (out[species.abilityName2] || 0) + (species.abilityValue2 || 0);
+    const applyAbility = (name, value) => {
+        if (name && name in out) out[name] = (out[name] || 0) + (+value || 0);
+    };
+    let appliedFromSpecies = false;
+    if (species?.abilityName1) { applyAbility(species.abilityName1, species.abilityValue1); appliedFromSpecies = true; }
+    if (species?.abilityName2) { applyAbility(species.abilityName2, species.abilityValue2); appliedFromSpecies = true; }
+    if (!appliedFromSpecies && cached.abilities) {
+        if (Array.isArray(cached.abilities)) {
+            for (const a of cached.abilities) applyAbility(a?.name, a?.value);
+        } else if (typeof cached.abilities === 'object') {
+            for (const [k, v] of Object.entries(cached.abilities)) applyAbility(k, v);
+        }
+    }
     if (Array.isArray(cached.passives)) {
         for (const p of cached.passives) {
             const key = passiveStatKey(p);
