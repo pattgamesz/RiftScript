@@ -249,20 +249,9 @@ async function readPetScreen() {
             }
 
             if (lastPets.length) {
-                // Update lastPets in place so any newly-scraped team rows
-                // override the previous team membership before re-emitting.
-                for (const lp of lastPets) {
-                    if (lp.location === 'team') lp.location = 'collection';
-                }
-                for (const sp of pets.filter(p => p.location === 'team')) {
-                    const match = lastPets.find(p =>
-                        p.name === sp.name && p.species === sp.species
-                    );
-                    if (match) {
-                        match.location = 'team';
-                        match.element = sp.element;
-                    }
-                }
+                // We already have a full pets list from a previous Pets
+                // sub-tab visit. Re-emit it as-is — going to Expedition /
+                // Breeding and back to Pets must not touch team membership.
                 events.emit('reader-pet', lastPets);
             } else if (pets.length) {
                 // No prior full-collection cache, but the Expedition Team
