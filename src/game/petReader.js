@@ -71,6 +71,29 @@ async function getApiPets() {
     return extractPetsFromUser(resp);
 }
 
+// Overlay freshly-scraped Expedition-Team rows on top of the cached full
+// pets list. For each lastPet whose (name, species) matches a scraped row,
+// take the scraped element + location + level (in case the pet just levelled
+// up) but keep the cached apiId/apiStats so chips and stats lookups continue
+// working. Pets not present in the scrape pass through unchanged.
+function mergeTeamIntoLastPets(lastPets, scrapedPets) {
+    if (!scrapedPets.length) return lastPets;
+    const scrapedByKey = new Map();
+    for (const sp of scrapedPets) {
+        scrapedByKey.set(`${sp.name}|${sp.species}`, sp);
+    }
+    return lastPets.map(p => {
+        const sp = scrapedByKey.get(`${p.name}|${p.species}`);
+        if (!sp) return p;
+        return {
+            ...p,
+            location: sp.location,
+            element: sp.element,
+            level: sp.level,
+        };
+    });
+}
+
 // Attach apiId + apiStats to pets[] using the supplied apiPets list.
 // Returns true when at least one pet's apiId actually changed.
 function enrichPetsWithApi(pets, apiPets) {
@@ -193,19 +216,45 @@ async function readPetScreen() {
                     events.emit('reader-pet', pets);
                 }
             }).catch(() => { /* swallow — sync fallback already emitted */ });
-        } else {
-            // Non-Pets sub-tab. The Expedition / Breeding sub-tabs do show pet
-            // rows (the 3 team pets), but without the Ranch+Team headers our
-            // is-Pets-sub-tab check needs. Use those visible rows to bootstrap
-            // knownTeamNames so the Expedition calc has the right team even on
-            // a cold first load when the user's saved default sub-tab IS
-            // Expedition and they've never visited the Pets sub-tab this
-            // session.
-            if (pets.length) {
-                knownTeamNames = new Set(pets.map(p => p.name));
+        } else if (pets.length) {
+            // Non-Pets sub-tab WITH visible pet rows — that's the Expedition
+            // or Breeding sub-tab showing the 3 team pets. Use the scraped
+            // rows directly so the expedition calc has team data without
+            // needing the API name to round-trip through knownTeamNames.
+            // Don't replace lastPets with this partial list (it has no
+            // collection / ranch rows) — keep that as the authoritative
+            // source for the Pets sub-tab view.
+            const groupCounters = {};
+            for (const p of pets) {
+                const k = `${p.name}|${p.species}|${p.level}`;
+                p.groupIndex = (groupCounters[k] || 0);
+                groupCounters[k] = p.groupIndex + 1;
+            }
+            const teamFromScrape = pets.filter(p => p.location === 'team').map(p => p.name);
+            if (teamFromScrape.length) {
+                knownTeamNames = new Set(teamFromScrape);
                 saveKnownTeamNames();
             }
+            // Hot-path enrichment, then emit.
+            enrichPetsWithApi(pets, getApiPetsSync());
+            // If we already have a full-collection cache, merge the
+            // freshly-scraped team rows over it so the panel still sees
+            // every pet. Otherwise emit the partial list — it covers the
+            // expedition calc's needs.
+            const merged = lastPets.length
+                ? mergeTeamIntoLastPets(lastPets, pets)
+                : pets;
+            events.emit('reader-pet', merged);
 
+            // Background API enrichment for the partial list too.
+            getApiPets().then(apiPets => {
+                if (enrichPetsWithApi(pets, apiPets)) {
+                    events.emit('reader-pet', lastPets.length
+                        ? mergeTeamIntoLastPets(lastPets, pets)
+                        : pets);
+                }
+            }).catch(() => { /* swallow */ });
+        } else {
             if (lastPets.length) {
                 // Re-emit the last good scrape so the expedition calc keeps
                 // its data.
