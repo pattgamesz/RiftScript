@@ -25,7 +25,6 @@ const ICON_COLORS_KEY = 'pet-icon-colors-enabled';
 
 let activeTab = 'manager'; // 'manager' | 'expedition'
 let panelPoller = null;    // self-stopping poller, only runs while on taming
-let rowObserver = null;    // MutationObserver, re-attached on every taming entry
 
 export function initPetFilter() {
     activeTab = gget(TAB_KEY, 'manager');
@@ -60,10 +59,12 @@ export function initPetFilter() {
     panelPoller = pollUntilDone(() => {
         if (!$('taming-page').length) return false; // left taming → stop
         if (!$(`#${PANEL_ID}`).length) ensurePanel();
-        // Backstop: re-attach the row observer in case Angular replaced the
-        // taming-page subtree (sub-tab switch). Re-trigger if a row lost
-        // its marker class.
-        attachRowObserver();
+        // Backstop: re-trigger the reader if any visible row lost its marker
+        // class (Angular re-renders rows on level-up / breed / feed and
+        // wipes the children we injected). 1Hz is intentionally calm — a
+        // faster MutationObserver fed a feedback loop with the chip
+        // injection mutations + Angular's change detection, which the user
+        // saw as constant flicker.
         if (anyRowMissingMarker()) triggerPetReader();
     }, 1000);
 
@@ -72,38 +73,12 @@ export function initPetFilter() {
     bindDelegatedHandlers();
 }
 
-// Cached stats don't change when a pet levels up (we key by stable apiId now),
-// but Angular re-renders the row's children on level-up / breed / equip swap
-// and that wipes our injected chips. Watch the taming-page subtree and
-// re-trigger the reader within ~50ms whenever a row loses its marker class,
-// so chips reappear before the user can perceive a flicker.
-const debouncedRetrigger = (() => {
-    let pending = null;
-    return () => {
-        if (pending) return;
-        pending = setTimeout(() => {
-            pending = null;
-            if (anyRowMissingMarker()) triggerPetReader();
-        }, 50);
-    };
-})();
-
 function anyRowMissingMarker() {
     const rows = document.querySelectorAll('taming-page button.row');
     for (const row of rows) {
         if (!row.classList.contains('rs-pet-processed')) return true;
     }
     return false;
-}
-
-function attachRowObserver() {
-    const target = document.querySelector('taming-page');
-    if (!target) return;
-    if (rowObserver?._target === target) return; // already watching this exact node
-    if (rowObserver) rowObserver.disconnect();
-    rowObserver = new MutationObserver(debouncedRetrigger);
-    rowObserver.observe(target, { childList: true, subtree: true });
-    rowObserver._target = target;
 }
 
 function bindDelegatedHandlers() {
@@ -159,9 +134,6 @@ function onPage(page) {
     retryAfter(ensurePanel);
     // Re-arm the panel poller in case we just navigated back to taming.
     if (panelPoller && !panelPoller.running) panelPoller.start();
-    // Attach the row observer to the (possibly fresh) taming-page node so we
-    // re-inject chips within ~50ms after any Angular re-render.
-    retryAfter(attachRowObserver);
 }
 
 function ensurePanel() {

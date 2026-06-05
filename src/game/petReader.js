@@ -152,6 +152,15 @@ async function readPetScreen() {
         const hasTeamCard  = $('taming-page .card .header:contains("Expedition Team")').length > 0;
         const hasRanchCard = $('taming-page .card .header:contains("Ranch")').length > 0;
         const isPetsSubTab = hasTeamCard && hasRanchCard;
+        // Expedition sub-tab signature: the Stats card has the "Expedition
+        // Trait Rotation" / "Total Taming XP" rows. The pet rows visible
+        // there are the player's team but the card containing them has no
+        // "Expedition Team" header, so partOfTeam from the per-row check
+        // would mark them collection. Override below.
+        const isExpeditionSubTab = !isPetsSubTab && (
+            $('taming-page .name:contains("Expedition Trait Rotation")').length > 0
+            || $('taming-page .name:contains("Total Taming XP")').length > 0
+        );
 
         const pets = [];
         $('taming-page button.row').each((_i, el) => {
@@ -171,7 +180,13 @@ async function readPetScreen() {
             const $card = $el.closest('.card');
             const partOfTeam = !!$card.find('.header:contains("Expedition Team")').length;
             const partOfRanch = !!$card.find('.header:contains("Ranch")').length;
-            const location = partOfTeam ? 'team' : partOfRanch ? 'ranch' : 'collection';
+            // On the Expedition sub-tab the only pet rows visible are the
+            // team itself, so default everything there to team if not
+            // otherwise tagged.
+            const location = partOfTeam ? 'team'
+                : partOfRanch ? 'ranch'
+                : isExpeditionSubTab ? 'team'
+                : 'collection';
 
             pets.push({
                 species: species.id,
