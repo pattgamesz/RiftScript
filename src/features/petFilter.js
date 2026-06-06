@@ -8,7 +8,7 @@ import * as events from '../core/events.js';
 import { trigger as triggerPetReader } from '../game/petReader.js';
 import { data } from '../game/data.js';
 import { get as gget, set as gset, getOnDefault } from '../core/settings.js';
-import { getPetStats, getCachedCount } from '../core/petStats.js';
+import { getPetStats, setPetStats, getCachedCount } from '../core/petStats.js';
 import { formatNumber, escapeHtml, MOBILE_BREAKPOINT, retryAfter, debounce, pollUntilDone } from '../core/util.js';
 import { getExpeditionResults, scrapeRotationsFromDOM } from './expeditionCalc.js';
 
@@ -465,14 +465,19 @@ function applyToList(pets) {
         .toggleClass('rs-pet-icon-colors-on', iconColorsEnabled);
 
     // Attach stats — prefer getUser API (unique per pet ID), fall back to modal-scrape cache.
-    // Prefer apiStats only when it actually carries stat numbers. The
-    // rift-guild getUser response often returns a pet entry without
-    // health/attack/defense fields, in which case apiStats is a truthy
-    // object but useless for the chip lookup. Fall through to the modal-
-    // scraped petStats cache (apiId-keyed → survives rename + level-up).
+    // Always go through petStats — the modal-scraped percentages are the
+    // only stats the chip render + expedition calc agree on. apiStats from
+    // getUser is mostly null fields and would short-circuit the lookup.
+    //
+    // Also re-write any found entry back through setPetStats with the
+    // pet's current (name, level, apiId). Each pet's modal scrape may have
+    // happened under a different name (rename) or level (level-up), so
+    // re-writing under the current keys keeps the cache reachable from
+    // every future lookup — no more "must re-open modal after rename".
     for (const pet of pets) {
-        const apiUsable = pet.apiStats && pet.apiStats.health != null;
-        pet.cachedStats = apiUsable ? pet.apiStats : getPetStats(pet);
+        const cached = getPetStats(pet);
+        pet.cachedStats = cached;
+        if (cached && pet.apiId) setPetStats(pet, cached);
     }
 
     const fingerprintCount = countFingerprints(pets);
