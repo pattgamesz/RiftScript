@@ -61,15 +61,38 @@ export function getPetStats(pet) {
     //    not yet populated because the modal hasn't been scraped on this
     //    build). Scan the cache for an entry whose stored apiId matches,
     //    then re-key it under both the current legacy + apiId keys.
-    if (pet.apiId) {
-        for (const entry of Object.values(c)) {
-            if (entry?.apiId === pet.apiId) {
-                c[lkey] = entry;
-                if (idKey) c[idKey] = entry;
-                persist();
-                return entry;
-            }
+    // Two scans, in order of confidence:
+    //   3a) match an entry whose stored apiId equals pet.apiId
+    //   3b) fall back to species|level|groupIndex parsed from the key —
+    //       works for the common non-breeder case where species + level +
+    //       position uniquely identify the pet, even without apiId
+    // Whichever hits, re-key the entry under the current legacy + apiId
+    // keys so subsequent lookups skip this scan entirely.
+    const targetSp = String(pet.species ?? '');
+    const targetLv = String(pet.level ?? '');
+    const targetGi = String(pet.groupIndex ?? 0);
+    let bestMatch = null;
+    let bestTs = 0;
+    for (const [k, entry] of Object.entries(c)) {
+        if (!entry) continue;
+        if (pet.apiId && entry.apiId === pet.apiId) {
+            bestMatch = entry;
+            break;
         }
+        if (k.startsWith('id:')) continue;
+        const parts = k.split('|');
+        if (parts.length !== 4) continue;
+        if (parts[1] === targetSp && parts[2] === targetLv && parts[3] === targetGi) {
+            const ts = +(entry.updatedAt || 0);
+            if (ts >= bestTs) { bestMatch = entry; bestTs = ts; }
+        }
+    }
+    if (bestMatch) {
+        if (pet.apiId && !bestMatch.apiId) bestMatch.apiId = pet.apiId;
+        c[lkey] = bestMatch;
+        if (idKey) c[idKey] = bestMatch;
+        persist();
+        return bestMatch;
     }
     return null;
 }
