@@ -246,22 +246,41 @@ async function readPetScreen() {
         } else {
             // No prior scrape — first load on a sub-tab without pet rows.
             // Reconstruct from API so the expedition calc has team data.
+            // The new extractor already sets location from user.pets.team /
+            // ranch (arrays of petIds), so we don't need to second-guess via
+            // knownTeamNames name-matching any more — that broke as soon as
+            // any team pet was renamed.
             const apiPets = await getApiPets();
             if (apiPets?.length) {
+                // Group by species|level to assign stable groupIndexes the
+                // chip cache / matching logic can rely on.
+                const counters = {};
                 const reconstructed = apiPets.map(ap => {
                     const species = data.pets?.byId?.[ap.species];
+                    const k = `${ap.species}|${ap.level}`;
+                    const gi = counters[k] || 0;
+                    counters[k] = gi + 1;
                     return {
                         species: ap.species,
                         family: species?.family,
                         name: ap.name,
                         level: ap.level,
-                        location: knownTeamNames.has(ap.name) ? 'team' : 'collection',
-                        groupIndex: 0,
+                        // Map getUser's storage bucket to the legacy 'collection'
+                        // label so applyToList's family-filter behaves the same
+                        // as for DOM-scraped pets.
+                        location: ap.location === 'storage' ? 'collection' : ap.location,
+                        groupIndex: gi,
                         element: $(),
                         apiId: ap.id,
                         apiStats: ap,
                     };
                 });
+                // Persist the team names too so a refresh on a non-team-card
+                // sub-tab can still bootstrap before getUser comes back.
+                knownTeamNames = new Set(reconstructed
+                    .filter(p => p.location === 'team')
+                    .map(p => p.name));
+                saveKnownTeamNames();
                 lastPets = reconstructed;
                 events.emit('reader-pet', reconstructed);
             }
