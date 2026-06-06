@@ -64,6 +64,29 @@ async function getApiPets() {
     return extractPetsFromUser(resp);
 }
 
+// Match scraped pets against the API list by (name|species|level) bucket +
+// position within bucket. Only attaches apiId/apiStats; never overwrites a
+// pet that's already enriched, so a second pass after a force-refresh fills
+// in only the pets the cached fetch missed.
+function enrichPetsFromApiPets(pets, apiPets) {
+    const apiGroups = {};
+    for (const ap of apiPets) {
+        const k = `${ap.name}|${ap.species}|${ap.level}`;
+        if (!apiGroups[k]) apiGroups[k] = [];
+        apiGroups[k].push(ap);
+    }
+    for (const p of pets) {
+        if (p.apiId) continue;
+        const k = `${p.name}|${p.species}|${p.level}`;
+        const bucket = apiGroups[k];
+        if (bucket && bucket[p.groupIndex]) {
+            const ap = bucket[p.groupIndex];
+            p.apiId = ap.id;
+            p.apiStats = ap;
+        }
+    }
+}
+
 function extractPetsFromUser(resp) {
     if (!resp || typeof resp !== 'object') return [];
     const keys = Object.keys(resp);
@@ -139,23 +162,18 @@ async function readPetScreen() {
                 groupCounters[k] = p.groupIndex + 1;
             }
 
-            // Try to attach unique IDs + stats from getUser API
-            const apiPets = await getApiPets();
-            if (apiPets?.length) {
-                const apiGroups = {};
-                for (const ap of apiPets) {
-                    const k = `${ap.name}|${ap.species}|${ap.level}`;
-                    if (!apiGroups[k]) apiGroups[k] = [];
-                    apiGroups[k].push(ap);
-                }
-                for (const p of pets) {
-                    const k = `${p.name}|${p.species}|${p.level}`;
-                    const bucket = apiGroups[k];
-                    if (bucket && bucket[p.groupIndex]) {
-                        const ap = bucket[p.groupIndex];
-                        p.apiId = ap.id;
-                        p.apiStats = ap;
-                    }
+            // Try to attach unique IDs + stats from getUser API. If the cached
+            // userCache is stale (e.g. the user just renamed a pet, so the
+            // scraped names don't match the API names yet), force a fresh
+            // getUser fetch and retry — apiId is what keeps the chip cache
+            // valid across rename / level-up, so we can't afford a miss.
+            let apiPets = await getApiPets();
+            if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
+            if (pets.some(p => !p.apiId)) {
+                const fresh = await getUser({ force: true });
+                if (fresh) {
+                    apiPets = extractPetsFromUser(fresh);
+                    if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
                 }
             }
 

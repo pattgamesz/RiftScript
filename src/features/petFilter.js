@@ -465,7 +465,15 @@ function applyToList(pets) {
         .toggleClass('rs-pet-icon-colors-on', iconColorsEnabled);
 
     // Attach stats — prefer getUser API (unique per pet ID), fall back to modal-scrape cache.
-    for (const pet of pets) pet.cachedStats = pet.apiStats || getPetStats(pet);
+    // Prefer apiStats only when it actually carries stat numbers. The
+    // rift-guild getUser response often returns a pet entry without
+    // health/attack/defense fields, in which case apiStats is a truthy
+    // object but useless for the chip lookup. Fall through to the modal-
+    // scraped petStats cache (apiId-keyed → survives rename + level-up).
+    for (const pet of pets) {
+        const apiUsable = pet.apiStats && pet.apiStats.health != null;
+        pet.cachedStats = apiUsable ? pet.apiStats : getPetStats(pet);
+    }
 
     const fingerprintCount = countFingerprints(pets);
     const bestPerFamily = computeBestPerFamily(pets);
