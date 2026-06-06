@@ -355,7 +355,15 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.5.8 — Craft target button + script load polish</div>
+                                <div class="rs-changelog-section">v1.6.6 — Market filter rewrite + hybrid game-data API</div>
+                                <ul>
+                                    <li><b>Best-deal market filters revamped</b> — each preset (Food, Charcoal, Compost, Arcane Powder, Pet Snacks, Metal Parts, Sigil Pieces, Research Points, Potion Mix) now sorts by the metric that actually matters: gold per HP, gold per coal, gold per compost, etc. Each row shows the per-item yield + the cost efficiency with a colour threshold.</li>
+                                    <li><b>Tribute filters</b> (Forest / Mountain / Ocean) use the API's <code>price</code> as the per-item tribute weight. Listings sorted by listing price ÷ tribute value — lower is a better deal per tribute point.</li>
+                                    <li><b>Hybrid game-data source</b> — items / actions / drops / ingredients / monsters / skills / structures now sourced from the live <a href="https://rift-guild.com/api/gameData" target="_blank">rift-guild gameData API</a> (extracted directly from ironwoodrpg's main.js, 1h CDN cache). Pets / petPassives / expeditions still self-hosted in the original Pancake shape so the expedition calc stays stable.</li>
+                                    <li><b>Recipe Clickthrough</b> re-applies on every sub-tab open — skills with Outskirts / Village tabs no longer fall back to disabled buttons after switching.</li>
+                                    <li><b>Pet panel</b>: expedition tier / week dropdowns no longer revert to old values mid-click; panel re-renders skip while a <code>&lt;select&gt;</code> is open. Pet reader reset to the v1.5.6 behaviour the panel was built on.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.5.8 — Craft target button + script load polish</div>
                                 <ul>
                                     <li><b>Target button on crafting modals</b> — same idea as the market Target button: type a desired total quantity, click Target, and the input drops to exactly what you still need to craft (target − owned). Native game styling via button clone. Toggle in Settings → Skills (default on).</li>
                                     <li><b>Smoother under the hood</b> — debounced the pet modal scanner so Angular's frequent re-renders no longer trigger 50+ DOM scans per second; debounced the post-modal re-render so rapid pet clicks no longer stack up full panel rebuilds; the market filter no longer clears your live search on sub-tab clicks.</li>
