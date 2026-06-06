@@ -162,28 +162,35 @@ async function readPetScreen() {
                 groupCounters[k] = p.groupIndex + 1;
             }
 
-            // Try to attach unique IDs + stats from getUser API. If the cached
-            // userCache is stale (e.g. the user just renamed a pet, so the
-            // scraped names don't match the API names yet), force a fresh
-            // getUser fetch and retry — apiId is what keeps the chip cache
-            // valid across rename / level-up, so we can't afford a miss.
-            let apiPets = await getApiPets();
-            if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
-            if (pets.some(p => !p.apiId)) {
-                const fresh = await getUser({ force: true });
-                if (fresh) {
-                    apiPets = extractPetsFromUser(fresh);
-                    if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
-                }
-            }
-
             // Remember team membership so we can reconstruct it on sub-tabs
             // where the team DOM isn't rendered (e.g., expedition sub-tab).
             knownTeamNames = new Set(pets.filter(p => p.location === 'team').map(p => p.name));
             saveKnownTeamNames();
 
+            // Emit IMMEDIATELY so chips render from the petStats cache via
+            // the legacy keys — instant for unchanged pets, which is the
+            // common case. Then enrich + re-emit in the background to catch
+            // the renamed-pet path (where apiId is what unlocks the cache).
             lastPets = pets;
             events.emit('reader-pet', pets);
+
+            // Background enrichment: cached userCache first, then a forced
+            // refresh if any pet still lacks an apiId (the userCache is
+            // stale right after a rename / new hatch).
+            (async () => {
+                let apiPets = await getApiPets();
+                if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
+                if (pets.some(p => !p.apiId)) {
+                    const fresh = await getUser({ force: true });
+                    if (fresh) {
+                        apiPets = extractPetsFromUser(fresh);
+                        if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
+                    }
+                }
+                if (pets.some(p => p.apiId)) {
+                    events.emit('reader-pet', pets);
+                }
+            })();
         } else if (lastPets.length) {
             // DOM has no pet rows we recognise, or we're on a non-Pets sub-tab.
             // Re-emit the last good scrape so the expedition calc keeps its data.

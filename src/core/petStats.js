@@ -1,7 +1,9 @@
-// Persistent cache of pet stats keyed by (name | species | level | groupIndex).
-// Pet names aren't unique — two same-species pets default to the same name,
-// so we add species + level + groupIndex to disambiguate. Populated when the
-// user opens a pet's modal.
+// Persistent cache of pet stats. Indexed under two keys: the legacy
+// (name|species|level|groupIndex) tuple AND a stable apiId-derived key
+// when known. Both keys point at the same entry object, and every entry
+// also carries its apiId in the value — that's what lets a rename or
+// level-up still resolve back to the cached stats (we scan stored values
+// for the matching apiId when both keys miss).
 const KEY = 'riftscript_pet_stats_v2';
 
 let cache = null;
@@ -22,8 +24,6 @@ function persist() {
 }
 
 function legacyKey(pet) {
-    // groupIndex disambiguates same-name+species+level pets (breeders),
-    // assuming the game shows them in stable order.
     return `${pet?.name || ''}|${pet?.species ?? ''}|${pet?.level ?? ''}|${pet?.groupIndex ?? 0}`;
 }
 
@@ -34,33 +34,59 @@ function apiKey(pet) {
 export function getPetStats(pet) {
     if (!pet?.name) return null;
     const c = load();
-    // Prefer the stable apiId key — survives renames + level-ups.
+
+    // 1) Stable apiId key — fastest path, survives rename + level-up.
     const idKey = apiKey(pet);
     if (idKey && c[idKey]) return c[idKey];
-    // Fall back to the legacy name|species|level|groupIndex key. If we
-    // find a hit AND know the apiId, also write the entry under the apiId
-    // key now so the next rename / level-up keeps finding it. We don't
-    // delete the legacy entry — keeping both is safe and lets older
-    // sessions continue to read it.
-    const legacy = c[legacyKey(pet)];
-    if (legacy && idKey && !c[idKey]) {
-        c[idKey] = legacy;
-        persist();
+
+    // 2) Legacy name|species|level|groupIndex key. When this hits and the
+    //    pet now has an apiId, migrate the entry forward so the apiId key
+    //    is populated for next time. We also stamp the apiId into the
+    //    entry value itself so case (3) below can find it after a rename.
+    const lkey = legacyKey(pet);
+    const legacy = c[lkey];
+    if (legacy) {
+        if (pet.apiId && !legacy.apiId) legacy.apiId = pet.apiId;
+        if (idKey && !c[idKey]) {
+            c[idKey] = legacy;
+            persist();
+        } else if (pet.apiId && !legacy.apiId) {
+            persist();
+        }
+        return legacy;
     }
-    return legacy || null;
+
+    // 3) Last resort — the pet has an apiId but no key in the cache matches
+    //    (typical after a rename: new name → legacy key shifted, apiId key
+    //    not yet populated because the modal hasn't been scraped on this
+    //    build). Scan the cache for an entry whose stored apiId matches,
+    //    then re-key it under both the current legacy + apiId keys.
+    if (pet.apiId) {
+        for (const entry of Object.values(c)) {
+            if (entry?.apiId === pet.apiId) {
+                c[lkey] = entry;
+                if (idKey) c[idKey] = entry;
+                persist();
+                return entry;
+            }
+        }
+    }
+    return null;
 }
 
 export function setPetStats(pet, stats) {
     if (!pet?.name || !stats) return;
     load();
     const lkey = legacyKey(pet);
-    const entry = { ...cache[lkey], ...stats, updatedAt: Date.now() };
-    // Write under the legacy key so the next session can still find this
-    // entry while apiId isn't yet hydrated.
+    const entry = {
+        ...cache[lkey],
+        ...stats,
+        // Stamp apiId in the value so subsequent renames can still find
+        // this entry via the scan in getPetStats() case 3.
+        apiId: pet.apiId ?? cache[lkey]?.apiId,
+        updatedAt: Date.now(),
+    };
     cache[lkey] = entry;
-    // Also write under the stable apiId key when we have one — this is what
-    // lets the lookup survive renames + level-ups. Both keys point at the
-    // same object; subsequent setPetStats updates both.
     const idKey = apiKey(pet);
     if (idKey) cache[idKey] = entry;
     persist();
