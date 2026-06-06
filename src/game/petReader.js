@@ -174,22 +174,29 @@ async function readPetScreen() {
             lastPets = pets;
             events.emit('reader-pet', pets);
 
-            // Background enrichment: cached userCache first, then a forced
-            // refresh if any pet still lacks an apiId (the userCache is
-            // stale right after a rename / new hatch).
+            // Background enrichment: ride on the shared 5-minute userCache;
+            // no force-refresh here. Hitting getUser every time the user
+            // renames or even just lands on the page triggers the game's
+            // rate limiter — and the cache hit IS enough for non-renamed
+            // pets, which is the common case.
             (async () => {
-                let apiPets = await getApiPets();
-                if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
-                if (pets.some(p => !p.apiId)) {
-                    const fresh = await getUser({ force: true });
-                    if (fresh) {
-                        apiPets = extractPetsFromUser(fresh);
-                        if (apiPets?.length) enrichPetsFromApiPets(pets, apiPets);
+                const apiPets = await getApiPets();
+                if (!apiPets?.length) return;
+                let changed = false;
+                for (const p of pets) {
+                    if (p.apiId) continue;
+                    // Same matching as enrichPetsFromApiPets, inlined so we
+                    // can detect if any pet actually got enriched.
+                    const k = `${p.name}|${p.species}|${p.level}`;
+                    const bucket = apiPets.filter(a => `${a.name}|${a.species}|${a.level}` === k);
+                    if (bucket[p.groupIndex]) {
+                        const ap = bucket[p.groupIndex];
+                        p.apiId = ap.id;
+                        p.apiStats = ap;
+                        changed = true;
                     }
                 }
-                if (pets.some(p => p.apiId)) {
-                    events.emit('reader-pet', pets);
-                }
+                if (changed) events.emit('reader-pet', pets);
             })();
         } else if (lastPets.length) {
             // DOM has no pet rows we recognise, or we're on a non-Pets sub-tab.
