@@ -90,11 +90,11 @@ function bindDelegatedHandlers() {
     });
     $(document).on('change', `${sel} .rs-exp-tier-select`, function() {
         gset(EXP_TIER_KEY, +$(this).val() || 0);
-        renderPanel();
+        renderPanel(true);
     });
     $(document).on('change', `${sel} .rs-exp-week`, function() {
         gset(EXP_WEEK_KEY, +$(this).val() || 0);
-        renderPanel();
+        renderPanel(true);
     });
     $(document).on('change', `${sel} .rs-pet-family`, function() {
         gset(FAMILY_KEY, $(this).val());
@@ -199,14 +199,17 @@ function handleResize() {
     }, 200);
 }
 
-function renderPanel() {
+function renderPanel(force = false) {
     const $panel = $(`#${PANEL_ID}`);
     if (!$panel.length) return;
     // Skip the re-render when the user is mid-interaction with a dropdown.
     // The 1Hz panelPoller and reader-pet emits would otherwise replace the
     // <select> the user just opened, cancelling their pending choice — the
     // exact reason tier / week dropdowns appeared to 'jump back' on change.
-    if ($panel.find('select:focus').length) return;
+    // Change handlers pass force=true so the saved choice gets reflected
+    // in the panel immediately, even though the select still has focus at
+    // the moment the change event fires.
+    if (!force && $panel.find('select:focus').length) return;
 
     $panel.html(`
         <div class="rs-pet-panel-card">
