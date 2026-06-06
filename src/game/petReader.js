@@ -35,6 +35,11 @@ function saveKnownTeamNames() {
 export function initPetReader() {
     loadKnownTeamNames();
     events.on('page', () => trigger());
+    // Fresh getUser data can arrive after the first cold-refresh trigger
+    // ran (auth token comes from IndexedDB; userCache populates async). When
+    // it does, re-run the reader so the Expedition tab gets reconstructed
+    // pet data even on a sub-tab where no pet rows are visible.
+    events.on('user-data', () => trigger());
     $(document).on('click', 'taming-page button, taming-page .tab', () => setTimeout(trigger, 200));
 
     // Track which exact pet row the user clicked so we can attribute modal data
@@ -246,13 +251,13 @@ async function readPetScreen() {
                 }
                 if (changed) events.emit('reader-pet', pets);
             })();
-        } else if (lastPets.length) {
-            // DOM has no pet rows we recognise, or we're on a non-Pets sub-tab.
-            // Re-emit the last good scrape so the expedition calc keeps its data.
-            events.emit('reader-pet', lastPets);
         } else {
-            // No prior scrape — first load on a sub-tab without pet rows.
-            // Reconstruct from API so the expedition calc has team data.
+            // No usable DOM scrape — either we're on a non-Pets sub-tab, or
+            // the page is still rendering. Try the API reconstruct path first
+            // so fresh getUser data (chip stats, team membership) replaces
+            // any previously-emitted stale list. Fall back to re-emitting
+            // lastPets if the API has nothing to offer yet (auth not ready).
+            //
             // The new extractor already sets location from user.pets.team /
             // ranch (arrays of petIds), so we don't need to second-guess via
             // knownTeamNames name-matching any more — that broke as soon as
@@ -290,6 +295,8 @@ async function readPetScreen() {
                 saveKnownTeamNames();
                 lastPets = reconstructed;
                 events.emit('reader-pet', reconstructed);
+            } else if (lastPets.length) {
+                events.emit('reader-pet', lastPets);
             }
         }
     } catch (e) {

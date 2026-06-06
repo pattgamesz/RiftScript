@@ -8,6 +8,7 @@
 //   whatever was last cached (better than null).
 import { api } from './api.js';
 import { hasAuth } from './auth.js';
+import * as events from './events.js';
 
 const STORAGE_KEY = 'riftscript_user_cache_v1';
 const TTL_MS = 5 * 60 * 1000;
@@ -31,6 +32,9 @@ function hydrate() {
             if (Date.now() - parsed.time < MAX_STALE_MS) {
                 memCache = parsed.data;
                 memTime = parsed.time;
+                // Emit so late subscribers (events.on replay) get the cached
+                // user payload even if no fresh fetch happens this session.
+                events.emit('user-data', memCache);
             }
         }
     } catch (e) { /* corrupt cache, ignore */ }
@@ -48,6 +52,10 @@ async function fetchFresh() {
         memCache = resp;
         memTime = Date.now();
         save();
+        // Wake up any feature that's been waiting for fresh user data —
+        // notably the pet reader's reconstruct path on a cold refresh that
+        // came up before the cache was populated.
+        events.emit('user-data', memCache);
         return memCache;
     } catch (e) {
         console.warn('[RiftScript] getUser fetch failed:', e.message);
