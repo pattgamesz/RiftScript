@@ -465,19 +465,22 @@ function applyToList(pets) {
         .toggleClass('rs-pet-icon-colors-on', iconColorsEnabled);
 
     // Attach stats — prefer getUser API (unique per pet ID), fall back to modal-scrape cache.
-    // Always go through petStats — the modal-scraped percentages are the
-    // only stats the chip render + expedition calc agree on. apiStats from
-    // getUser is mostly null fields and would short-circuit the lookup.
+    // apiStats now carries the real stat percentages from getUser (read
+    // straight off user.pets.storage), so it's the source of truth for
+    // chip render + expedition calc. petStats stays as a fallback for the
+    // first-load window before the userCache is hydrated.
     //
-    // Also re-write any found entry back through setPetStats with the
-    // pet's current (name, level, apiId). Each pet's modal scrape may have
-    // happened under a different name (rename) or level (level-up), so
-    // re-writing under the current keys keeps the cache reachable from
-    // every future lookup — no more "must re-open modal after rename".
+    // Whenever apiStats is the winner, also write it through to petStats
+    // so a later offline session still has something to render — and so
+    // the cache stays correct across renames / level-ups without any of
+    // the previous migration gymnastics.
     for (const pet of pets) {
-        const cached = getPetStats(pet);
-        pet.cachedStats = cached;
-        if (cached && pet.apiId) setPetStats(pet, cached);
+        if (pet.apiStats && pet.apiStats.health != null) {
+            pet.cachedStats = pet.apiStats;
+            if (pet.apiId) setPetStats(pet, pet.apiStats);
+        } else {
+            pet.cachedStats = getPetStats(pet);
+        }
     }
 
     const fingerprintCount = countFingerprints(pets);

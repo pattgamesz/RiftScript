@@ -2,7 +2,7 @@
 // Emits 'reader-pet' with a list of {species, family, name, level, location, element}.
 // Also watches for pet detail modals to scrape per-pet stats into our cache.
 import * as events from '../core/events.js';
-import { parseNumber, debounce } from '../core/util.js';
+import { parseNumber, debounce, expToLevel } from '../core/util.js';
 import { data } from './data.js';
 import { setPetStats } from '../core/petStats.js';
 import { getUser } from '../core/userCache.js';
@@ -64,45 +64,86 @@ async function getApiPets() {
     return extractPetsFromUser(resp);
 }
 
-// Match scraped pets against the API list by (name|species|level) bucket +
-// position within bucket. Only attaches apiId/apiStats; never overwrites a
-// pet that's already enriched, so a second pass after a force-refresh fills
-// in only the pets the cached fetch missed.
+// Match scraped pets against the getUser pet list by (species|level) +
+// position within that bucket. species + level is a more stable identity
+// than name+species+level — survives renames without breaking the match.
+// The bucket position is computed per (species|level) on both sides so the
+// indices line up.
 function enrichPetsFromApiPets(pets, apiPets) {
     const apiGroups = {};
     for (const ap of apiPets) {
-        const k = `${ap.name}|${ap.species}|${ap.level}`;
+        const k = `${ap.species}|${ap.level}`;
         if (!apiGroups[k]) apiGroups[k] = [];
         apiGroups[k].push(ap);
     }
+    const scrapeCounters = {};
     for (const p of pets) {
+        const k = `${p.species}|${p.level}`;
+        if (p._speciesGI == null) {
+            p._speciesGI = scrapeCounters[k] || 0;
+            scrapeCounters[k] = p._speciesGI + 1;
+        }
         if (p.apiId) continue;
-        const k = `${p.name}|${p.species}|${p.level}`;
         const bucket = apiGroups[k];
-        if (bucket && bucket[p.groupIndex]) {
-            const ap = bucket[p.groupIndex];
+        if (bucket && bucket[p._speciesGI]) {
+            const ap = bucket[p._speciesGI];
             p.apiId = ap.id;
             p.apiStats = ap;
         }
     }
 }
 
+// Pets in the getUser response live under user.pets.storage as a dict
+// keyed by the stable instance petId (e.g. "115" → { displayName: "Deowl34",
+// id: "119" (species), exp, bonuses: {health, attack, defense}, passives }).
+// team / ranch are arrays of those petIds pointing back into storage.
+//
+// This is the source of truth for every chip-render value we care about —
+// no modal scrape needed for stats, no fragile cache key needed for survival
+// across renames: petId is the unique stable identifier.
 function extractPetsFromUser(resp) {
     if (!resp || typeof resp !== 'object') return [];
-    const keys = Object.keys(resp);
-    const petsKey = keys.find(k => /pet/i.test(k) && Array.isArray(resp[k]));
-    if (!petsKey) return [];
-    const raw = resp[petsKey];
-    return raw.map(p => ({
-        id: p.id ?? p.petId ?? p.petID,
-        name: p.name ?? p.displayName,
-        species: p.species ?? p.speciesId ?? p.petSpecies,
-        level: p.level ?? 1,
-        health: p.health ?? p.statHealth ?? null,
-        attack: p.attack ?? p.statAttack ?? null,
-        defense: p.defense ?? p.statDefense ?? null,
-        passives: p.passives ?? p.petPassives ?? [],
-    })).filter(p => p.name);
+    const petData = resp.user?.pets || resp.pets;
+    if (!petData?.storage) return [];
+    const storage = petData.storage;
+    const teamSet  = new Set((petData.team  || []).map(String));
+    const ranchSet = new Set((petData.ranch || []).map(String));
+    const out = [];
+    for (const [key, p] of Object.entries(storage)) {
+        if (!p) continue;
+        const petId = p.petId ?? +key;
+        out.push({
+            id:       +petId || 0,
+            name:     p.displayName || '',
+            species:  +(p.id ?? 0) || 0,
+            exp:      +p.exp || 0,
+            level:    expToLevel(+p.exp || 0),
+            health:   p.bonuses?.health ?? null,
+            attack:   p.bonuses?.attack ?? null,
+            defense:  p.bonuses?.defense ?? null,
+            // Resolve passive IDs to the {name, level, effect} shape the
+            // chip renderer + expedition calc share with modal-scraped stats.
+            passives: (p.passives || []).map(transformPassive).filter(Boolean),
+            location: teamSet.has(String(petId))  ? 'team'
+                    : ranchSet.has(String(petId)) ? 'ranch'
+                    : 'storage',
+        });
+    }
+    return out.filter(p => p.name);
+}
+
+function transformPassive(rawId) {
+    const entry = data.petPassives?.byId?.[+rawId];
+    if (!entry) return null;
+    // Passive names are stored as "Melee Block 2" — split tier number off
+    // the end so the chip renderer's grouping by name + level still works.
+    const m = (entry.name || '').match(/^(.*?)\s+(\d+)$/);
+    return {
+        name:     m ? m[1] : entry.name,
+        level:    m ? +m[2] : entry.tier ?? null,
+        effect:   entry.statValue,
+        statName: entry.statName,
+    };
 }
 
 async function readPetScreen() {
