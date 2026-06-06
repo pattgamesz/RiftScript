@@ -112,15 +112,22 @@ function extractPetsFromUser(resp) {
     for (const [key, p] of Object.entries(storage)) {
         if (!p) continue;
         const petId = p.petId ?? +key;
+        const exp = +p.exp || 0;
         out.push({
             id:       +petId || 0,
             name:     p.displayName || '',
             species:  +(p.id ?? 0) || 0,
-            exp:      +p.exp || 0,
-            level:    expToLevel(+p.exp || 0),
-            health:   p.bonuses?.health ?? null,
-            attack:   p.bonuses?.attack ?? null,
-            defense:  p.bonuses?.defense ?? null,
+            exp,
+            // Pets cap at level 100 in-game even when exp climbs higher;
+            // every formula downstream assumes max-100 so cap here too.
+            level:    Math.min(expToLevel(exp), 100),
+            // getUser bonuses are stored as half the displayed percentage
+            // (each parent contributes up to 25 of a 0–50 range, the game
+            // doubles it for display). Every consumer expects the 0–100
+            // percentage form, so double it on the way out.
+            health:   p.bonuses?.health  != null ? p.bonuses.health  * 2 : null,
+            attack:   p.bonuses?.attack  != null ? p.bonuses.attack  * 2 : null,
+            defense: p.bonuses?.defense != null ? p.bonuses.defense * 2 : null,
             // Resolve passive IDs to the {name, level, effect} shape the
             // chip renderer + expedition calc share with modal-scraped stats.
             passives: (p.passives || []).map(transformPassive).filter(Boolean),
