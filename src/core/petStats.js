@@ -34,13 +34,20 @@ function apiKey(pet) {
 export function getPetStats(pet) {
     if (!pet?.name) return null;
     const c = load();
-    // Prefer the stable apiId key — survives renames + level-ups. Falls
-    // back to the legacy name|species|level|groupIndex key when apiId
-    // isn't known yet (cold scrape before getUser enrichment) or when
-    // the entry was written under the legacy key only.
+    // Prefer the stable apiId key — survives renames + level-ups.
     const idKey = apiKey(pet);
     if (idKey && c[idKey]) return c[idKey];
-    return c[legacyKey(pet)] || null;
+    // Fall back to the legacy name|species|level|groupIndex key. If we
+    // find a hit AND know the apiId, also write the entry under the apiId
+    // key now so the next rename / level-up keeps finding it. We don't
+    // delete the legacy entry — keeping both is safe and lets older
+    // sessions continue to read it.
+    const legacy = c[legacyKey(pet)];
+    if (legacy && idKey && !c[idKey]) {
+        c[idKey] = legacy;
+        persist();
+    }
+    return legacy || null;
 }
 
 export function setPetStats(pet, stats) {
