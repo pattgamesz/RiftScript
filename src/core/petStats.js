@@ -21,22 +21,41 @@ function persist() {
     } catch (e) { /* quota */ }
 }
 
-function buildKey(pet) {
+function legacyKey(pet) {
     // groupIndex disambiguates same-name+species+level pets (breeders),
     // assuming the game shows them in stable order.
     return `${pet?.name || ''}|${pet?.species ?? ''}|${pet?.level ?? ''}|${pet?.groupIndex ?? 0}`;
 }
 
+function apiKey(pet) {
+    return pet?.apiId ? `id:${pet.apiId}` : null;
+}
+
 export function getPetStats(pet) {
     if (!pet?.name) return null;
-    return load()[buildKey(pet)] || null;
+    const c = load();
+    // Prefer the stable apiId key — survives renames + level-ups. Falls
+    // back to the legacy name|species|level|groupIndex key when apiId
+    // isn't known yet (cold scrape before getUser enrichment) or when
+    // the entry was written under the legacy key only.
+    const idKey = apiKey(pet);
+    if (idKey && c[idKey]) return c[idKey];
+    return c[legacyKey(pet)] || null;
 }
 
 export function setPetStats(pet, stats) {
     if (!pet?.name || !stats) return;
     load();
-    const k = buildKey(pet);
-    cache[k] = { ...cache[k], ...stats, updatedAt: Date.now() };
+    const lkey = legacyKey(pet);
+    const entry = { ...cache[lkey], ...stats, updatedAt: Date.now() };
+    // Write under the legacy key so the next session can still find this
+    // entry while apiId isn't yet hydrated.
+    cache[lkey] = entry;
+    // Also write under the stable apiId key when we have one — this is what
+    // lets the lookup survive renames + level-ups. Both keys point at the
+    // same object; subsequent setPetStats updates both.
+    const idKey = apiKey(pet);
+    if (idKey) cache[idKey] = entry;
     persist();
 }
 

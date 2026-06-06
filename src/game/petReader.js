@@ -232,12 +232,19 @@ function maybeReadModal() {
 
     // Resolve which specific pet was clicked: prefer matching by the last
     // clicked DOM row, fall back to first matching name+species+level.
+    // Pick up the apiId off the matched pet so setPetStats writes a stable
+    // 'id:N' key alongside the legacy key — that's what lets the cache
+    // survive a rename or level-up without re-opening the modal.
     let groupIndex = 0;
+    let apiId = null;
     if (lastClickedRow) {
         const match = lastPets.find(p => p.element[0] === lastClickedRow);
-        if (match && match.name === name) groupIndex = match.groupIndex || 0;
+        if (match && match.name === name) {
+            groupIndex = match.groupIndex || 0;
+            apiId = match.apiId || null;
+        }
     }
-    const petKey = { name, species: species?.id, level, groupIndex };
+    const petKey = { name, species: species?.id, level, groupIndex, apiId };
     setPetStats(petKey, {
         species: species?.id,
         family: species?.family,
