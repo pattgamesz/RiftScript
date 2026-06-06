@@ -5,7 +5,7 @@ import * as events from '../core/events.js';
 import { parseNumber, debounce } from '../core/util.js';
 import { data } from './data.js';
 import { setPetStats } from '../core/petStats.js';
-import { getUser, getCachedUser } from '../core/userCache.js';
+import { getUser } from '../core/userCache.js';
 
 let inProgress = false;
 let modalObserver = null;
@@ -58,92 +58,10 @@ export function trigger() {
     readPetScreen();
 }
 
-// Synchronous fast-path. Returns null if no cache is hydrated yet — caller
-// should fall through to the async getApiPets() to fetch.
-function getApiPetsSync() {
-    const resp = getCachedUser();
-    return resp ? extractPetsFromUser(resp) : null;
-}
-
-// Build a single reconstructed pet object from a getUser entry, overlaying
-// any matching DOM-scraped row's fresh location / element / groupIndex
-// when one exists. Tries every available index on data.pets so the species
-// lookup doesn't depend on which key shape getUser happens to use.
-function buildReconstructedPet(ap, scrapedPets = []) {
-    const scraped = scrapedPets.find(p => p.name === ap.name);
-    const idx = data.pets || {};
-    const species = idx.byId?.[ap.species]
-        || idx.bySpecies?.[ap.species]
-        || idx.byTechnicalName?.[ap.species]
-        || idx.byName?.[ap.species]
-        || null;
-    return {
-        species: ap.species,
-        family: species?.family,
-        name: ap.name,
-        level: scraped?.level ?? ap.level,
-        location: scraped?.location
-            || (knownTeamNames.has(ap.name) ? 'team' : 'collection'),
-        groupIndex: scraped?.groupIndex ?? 0,
-        element: scraped?.element || $(),
-        apiId: ap.id,
-        apiStats: ap,
-    };
-}
-
 async function getApiPets() {
     const resp = await getUser();
     if (!resp) return null;
     return extractPetsFromUser(resp);
-}
-
-// Overlay freshly-scraped Expedition-Team rows on top of the cached full
-// pets list. For each lastPet whose (name, species) matches a scraped row,
-// take the scraped element + location + level (in case the pet just levelled
-// up) but keep the cached apiId/apiStats so chips and stats lookups continue
-// working. Pets not present in the scrape pass through unchanged.
-function mergeTeamIntoLastPets(lastPets, scrapedPets) {
-    if (!scrapedPets.length) return lastPets;
-    const scrapedByKey = new Map();
-    for (const sp of scrapedPets) {
-        scrapedByKey.set(`${sp.name}|${sp.species}`, sp);
-    }
-    return lastPets.map(p => {
-        const sp = scrapedByKey.get(`${p.name}|${p.species}`);
-        if (!sp) return p;
-        return {
-            ...p,
-            location: sp.location,
-            element: sp.element,
-            level: sp.level,
-        };
-    });
-}
-
-// Attach apiId + apiStats to pets[] using the supplied apiPets list.
-// Returns true when at least one pet's apiId actually changed.
-function enrichPetsWithApi(pets, apiPets) {
-    if (!apiPets?.length) return false;
-    const apiGroups = {};
-    for (const ap of apiPets) {
-        const k = `${ap.name}|${ap.species}|${ap.level}`;
-        if (!apiGroups[k]) apiGroups[k] = [];
-        apiGroups[k].push(ap);
-    }
-    let changed = false;
-    for (const p of pets) {
-        const k = `${p.name}|${p.species}|${p.level}`;
-        const bucket = apiGroups[k];
-        if (bucket && bucket[p.groupIndex]) {
-            const ap = bucket[p.groupIndex];
-            if (p.apiId !== ap.id) {
-                p.apiId = ap.id;
-                p.apiStats = ap;
-                changed = true;
-            }
-        }
-    }
-    return changed;
 }
 
 function extractPetsFromUser(resp) {
@@ -178,15 +96,6 @@ async function readPetScreen() {
         const hasTeamCard  = $('taming-page .card .header:contains("Expedition Team")').length > 0;
         const hasRanchCard = $('taming-page .card .header:contains("Ranch")').length > 0;
         const isPetsSubTab = hasTeamCard && hasRanchCard;
-        // Expedition sub-tab signature: the Stats card has the "Expedition
-        // Trait Rotation" / "Total Taming XP" rows. The pet rows visible
-        // there are the player's team but the card containing them has no
-        // "Expedition Team" header, so partOfTeam from the per-row check
-        // would mark them collection. Override below.
-        const isExpeditionSubTab = !isPetsSubTab && (
-            $('taming-page .name:contains("Expedition Trait Rotation")').length > 0
-            || $('taming-page .name:contains("Total Taming XP")').length > 0
-        );
 
         const pets = [];
         $('taming-page button.row').each((_i, el) => {
@@ -206,13 +115,7 @@ async function readPetScreen() {
             const $card = $el.closest('.card');
             const partOfTeam = !!$card.find('.header:contains("Expedition Team")').length;
             const partOfRanch = !!$card.find('.header:contains("Ranch")').length;
-            // On the Expedition sub-tab the only pet rows visible are the
-            // team itself, so default everything there to team if not
-            // otherwise tagged.
-            const location = partOfTeam ? 'team'
-                : partOfRanch ? 'ranch'
-                : isExpeditionSubTab ? 'team'
-                : 'collection';
+            const location = partOfTeam ? 'team' : partOfRanch ? 'ranch' : 'collection';
 
             pets.push({
                 species: species.id,
@@ -236,101 +139,58 @@ async function readPetScreen() {
                 groupCounters[k] = p.groupIndex + 1;
             }
 
+            // Try to attach unique IDs + stats from getUser API
+            const apiPets = await getApiPets();
+            if (apiPets?.length) {
+                const apiGroups = {};
+                for (const ap of apiPets) {
+                    const k = `${ap.name}|${ap.species}|${ap.level}`;
+                    if (!apiGroups[k]) apiGroups[k] = [];
+                    apiGroups[k].push(ap);
+                }
+                for (const p of pets) {
+                    const k = `${p.name}|${p.species}|${p.level}`;
+                    const bucket = apiGroups[k];
+                    if (bucket && bucket[p.groupIndex]) {
+                        const ap = bucket[p.groupIndex];
+                        p.apiId = ap.id;
+                        p.apiStats = ap;
+                    }
+                }
+            }
+
             // Remember team membership so we can reconstruct it on sub-tabs
             // where the team DOM isn't rendered (e.g., expedition sub-tab).
             knownTeamNames = new Set(pets.filter(p => p.location === 'team').map(p => p.name));
             saveKnownTeamNames();
 
-            // Synchronous enrichment from whatever is already cached — instant
-            // on hot path (localStorage or in-memory). Chips render NOW with
-            // full data when the cache is warm.
-            enrichPetsWithApi(pets, getApiPetsSync());
-
             lastPets = pets;
             events.emit('reader-pet', pets);
-
-            // Background refresh — fetches getUser if the cache is stale or
-            // empty, then re-emits if new data unlocks any pet IDs. Doesn't
-            // block initial chip render on the cold-start network roundtrip.
-            getApiPets().then(apiPets => {
-                if (enrichPetsWithApi(pets, apiPets)) {
-                    events.emit('reader-pet', pets);
-                }
-            }).catch(() => { /* swallow — sync fallback already emitted */ });
+        } else if (lastPets.length) {
+            // DOM has no pet rows we recognise, or we're on a non-Pets sub-tab.
+            // Re-emit the last good scrape so the expedition calc keeps its data.
+            events.emit('reader-pet', lastPets);
         } else {
-            // Non-Pets sub-tab. The Expedition / Breeding sub-tabs show the
-            // 3 team pets but without the Ranch+Team headers our
-            // is-Pets-sub-tab check needs. Persist team names from the visible
-            // rows (so a cold load on Expedition still knows the team), then
-            // fall through to re-emit lastPets (if any) or reconstruct from
-            // API. Don't replace lastPets with the partial scrape.
-            if (pets.length) {
-                const teamNames = pets
-                    .filter(p => p.location === 'team')
-                    .map(p => p.name);
-                if (teamNames.length) {
-                    knownTeamNames = new Set(teamNames);
-                    saveKnownTeamNames();
-                }
-            }
-
-            if (lastPets.length) {
-                // We already have a full pets list from a previous Pets
-                // sub-tab visit. Re-emit it as-is — going to Expedition /
-                // Breeding and back to Pets must not touch team membership.
-                events.emit('reader-pet', lastPets);
-            } else {
-                // Sync-first reconstruction from the userCache. Cold refresh
-                // on the Expedition sub-tab hits this — every piece of data
-                // the expedition calc needs is already in localStorage:
-                //   - userCache (the getUser response, hydrated synchronously)
-                //   - knownTeamNames (loaded on init for team membership)
-                //   - petStats (looked up by apiId by applyToList downstream)
-                //   - data.pets (indexed for species lookup)
-                // No network roundtrip needed for the initial emit.
-                const syncApiPets = getApiPetsSync();
-                if (syncApiPets?.length) {
-                    const reconstructed = syncApiPets.map(ap => buildReconstructedPet(ap, pets));
-                    lastPets = reconstructed;
-                    events.emit('reader-pet', reconstructed);
-
-                    // Background refresh — only re-emit if the new fetch
-                    // brought back a different number of pets (handles new
-                    // hatch / release between sessions).
-                    getApiPets().then(fresh => {
-                        if (fresh?.length && fresh.length !== syncApiPets.length) {
-                            const refreshed = fresh.map(ap => buildReconstructedPet(ap, pets));
-                            lastPets = refreshed;
-                            events.emit('reader-pet', refreshed);
-                        }
-                    }).catch(() => { /* swallow */ });
-                } else if (pets.length) {
-                    // No cache at all (first run after install) but visible
-                    // team rows exist on the Expedition sub-tab — use those.
-                    const groupCounters = {};
-                    for (const p of pets) {
-                        const k = `${p.name}|${p.species}|${p.level}`;
-                        p.groupIndex = (groupCounters[k] || 0);
-                        groupCounters[k] = p.groupIndex + 1;
-                    }
-                    events.emit('reader-pet', pets);
-                    // Fetch in the background to enrich with apiStats.
-                    getApiPets().then(fresh => {
-                        if (fresh?.length) {
-                            const reconstructed = fresh.map(ap => buildReconstructedPet(ap, pets));
-                            lastPets = reconstructed;
-                            events.emit('reader-pet', reconstructed);
-                        }
-                    }).catch(() => {});
-                } else {
-                    // Truly cold (no cache, no DOM rows) — wait for the API.
-                    const apiPets = await getApiPets();
-                    if (apiPets?.length) {
-                        const reconstructed = apiPets.map(ap => buildReconstructedPet(ap, pets));
-                        lastPets = reconstructed;
-                        events.emit('reader-pet', reconstructed);
-                    }
-                }
+            // No prior scrape — first load on a sub-tab without pet rows.
+            // Reconstruct from API so the expedition calc has team data.
+            const apiPets = await getApiPets();
+            if (apiPets?.length) {
+                const reconstructed = apiPets.map(ap => {
+                    const species = data.pets?.byId?.[ap.species];
+                    return {
+                        species: ap.species,
+                        family: species?.family,
+                        name: ap.name,
+                        level: ap.level,
+                        location: knownTeamNames.has(ap.name) ? 'team' : 'collection',
+                        groupIndex: 0,
+                        element: $(),
+                        apiId: ap.id,
+                        apiStats: ap,
+                    };
+                });
+                lastPets = reconstructed;
+                events.emit('reader-pet', reconstructed);
             }
         }
     } catch (e) {

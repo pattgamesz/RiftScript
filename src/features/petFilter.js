@@ -202,6 +202,11 @@ function handleResize() {
 function renderPanel() {
     const $panel = $(`#${PANEL_ID}`);
     if (!$panel.length) return;
+    // Skip the re-render when the user is mid-interaction with a dropdown.
+    // The 1Hz panelPoller and reader-pet emits would otherwise replace the
+    // <select> the user just opened, cancelling their pending choice — the
+    // exact reason tier / week dropdowns appeared to 'jump back' on change.
+    if ($panel.find('select:focus').length) return;
 
     $panel.html(`
         <div class="rs-pet-panel-card">
