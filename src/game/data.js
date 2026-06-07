@@ -20,6 +20,19 @@ function parseId(v) {
     return Number.isFinite(n) && String(n) === String(v).trim() ? n : v;
 }
 
+// The rift-guild extraction sets some IDs to null because they weren't
+// reachable from the enum tables in main.js. The game itself still uses
+// numeric IDs in routes — `/skill/1/action/1` for Pine Tree on Woodcutting —
+// so without a backfill, cold-refresh on those pages can't resolve the
+// skill or action. Mapping is by technicalName.
+const ID_BACKFILL = {
+    skill:  { Woodcutting: 1 },
+    // Pine Tree's real game action ID is 10 (matches its primary drop's item
+    // ID — every Woodcutting action follows that pattern: Spruce Tree = 11
+    // drops Spruce Log = 11, Birch Tree = 12 drops Birch Log = 12, etc.).
+    action: { PineTree: 10 },
+};
+
 function pruneOldCaches() {
     try {
         for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -113,8 +126,11 @@ function adaptItem(raw) {
 }
 
 function adaptSkill(raw, index) {
+    const backfill = ID_BACKFILL.skill[raw.technicalName];
     return {
-        id: raw.id != null ? parseId(raw.id) : -(index + 1),
+        id: raw.id != null ? parseId(raw.id)
+          : backfill != null ? backfill
+          : -(index + 1),
         displayName: raw.displayName || raw.technicalName || `Skill ${index}`,
         technicalName: raw.technicalName,
         type: raw.type || 'Other',
@@ -130,8 +146,11 @@ function adaptSkill(raw, index) {
 // estimator can read them via `data.drops.byAction` / `data.ingredients
 // .byAction` exactly like before.
 function adaptSkillAction(raw) {
+    const backfill = ID_BACKFILL.action[raw.technicalName];
     return {
-        id: parseId(raw.id),
+        id: raw.id != null ? parseId(raw.id)
+          : backfill != null ? backfill
+          : null,
         name: raw.displayName || raw.technicalName || '',
         technicalName: raw.technicalName,
         displayName: raw.displayName,
@@ -327,36 +346,46 @@ function processRawData(raw) {
     // arrays on actions + conversionActions. The /drops endpoint covers
     // skill-action drops (gather-style); /actions has them embedded too and
     // is what we use here for completeness with ingredients/conversions.
+    //
+    // rift-guild chance values are 0–1000 (1000 = 100%). The estimator and
+    // every other consumer assumes 0–1, so we normalise once at the source.
     const allDrops = [];
     const allIngredients = [];
+    const toFrac = c => (c == null ? 0 : c / 1000);
+
+    function actionIdOf(a) {
+        if (a.id != null) return parseId(a.id);
+        const bf = ID_BACKFILL.action[a.technicalName];
+        return bf != null ? bf : null;
+    }
 
     for (const a of (raw.actions || [])) {
-        const aid = parseId(a.id);
+        const aid = actionIdOf(a);
         for (const dd of (a.drops || [])) {
             allDrops.push({
                 action: aid, item: parseId(dd.id),
-                chance: dd.chance, amount: dd.amount ?? 1,
+                chance: toFrac(dd.chance), amount: dd.amount ?? 1,
                 type: null,
             });
         }
         for (const dd of (a.rareDrops || [])) {
             allDrops.push({
                 action: aid, item: parseId(dd.id),
-                chance: dd.chance, amount: dd.amount ?? 1,
+                chance: toFrac(dd.chance), amount: dd.amount ?? 1,
                 type: 'RARE',
             });
         }
         for (const dd of (a.failDrops || [])) {
             allDrops.push({
                 action: aid, item: parseId(dd.id),
-                chance: dd.chance, amount: dd.amount ?? 1,
+                chance: toFrac(dd.chance), amount: dd.amount ?? 1,
                 type: 'FAILED',
             });
         }
         for (const dd of (a.monsterDrops || [])) {
             allDrops.push({
                 action: aid, item: parseId(dd.id),
-                chance: dd.chance, amount: dd.amount ?? 1,
+                chance: toFrac(dd.chance), amount: dd.amount ?? 1,
                 type: 'MONSTER',
             });
         }
@@ -374,7 +403,7 @@ function processRawData(raw) {
             // existing valuator code reads the right value.
             allDrops.push({
                 action: aid, item: parseId(dd.id),
-                chance: dd.chance,
+                chance: toFrac(dd.chance),
                 amount: dd.amountManual ?? dd.amount ?? 1,
                 amountAutomation: dd.amountAutomation,
                 amountManual: dd.amountManual,
@@ -414,6 +443,7 @@ function processRawData(raw) {
         list: allActions,
         byId: indexBy(allActions, 'id'),
         byName: indexBy(allActions, 'name'),
+        byTechnicalName: indexBy(allActions, 'technicalName'),
     };
 
     const dropsByAction = {};

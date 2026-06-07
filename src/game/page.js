@@ -49,10 +49,18 @@ function detectPage(url) {
     const parts = url.replace(/.*ironwoodrpg\.com/, '').split('/').filter(Boolean);
 
     if (url.includes('/skill/') && url.includes('/action/')) {
+        const skillRaw = parts[parts.indexOf('skill') + 1];
+        const actionRaw = parts[parts.indexOf('action') + 1];
         events.emit('page', {
             type: 'action',
-            skill: +parts[parts.indexOf('skill') + 1],
-            action: +parts[parts.indexOf('action') + 1],
+            // Routes may use either numeric IDs (/action/11) or
+            // technicalNames (/action/PineTree). Emit a parsed number when
+            // possible (most consumers want it numeric) and keep the raw
+            // segment so the estimator can fall back to a technicalName
+            // lookup when the number doesn't resolve.
+            skill: Number.isFinite(+skillRaw) ? +skillRaw : skillRaw,
+            action: Number.isFinite(+actionRaw) ? +actionRaw : actionRaw,
+            skillRaw, actionRaw,
         });
     } else if (url.includes('/skill/15')) {
         events.emit('page', { type: 'taming' });

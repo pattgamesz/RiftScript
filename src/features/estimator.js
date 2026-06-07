@@ -1,12 +1,29 @@
-// Estimator — reads game estimates, calculates time to level, profit, etc.
+// Estimator — turns the active skill page into a single { drops, materials,
+// consumables, bottleneck, profit, level-up, … } estimation object that the
+// panel UI renders.
+//
+// Data sources, in order of trust:
+//   1. The game's own Estimates tab (DOM) — authoritative for actions/hr,
+//      XP/hr, damage/hr, food/hr because it already includes every buff,
+//      potion, sigil and tome effect the player has stacked.
+//   2. main.js item / action / drop catalog (rift-guild API) — base prices,
+//      drop chances (normalised 0–1 in the adapter), recipe inputs.
+//   3. getUser inventory + equipment — total stored counts per item, with
+//      both the equipment slot's own stack and the bag bag tallied.
+//   4. Action base speed from main.js — fallback when the Estimates tab
+//      hasn't rendered yet.
+//
+// Profit = drop gold/hr − material gold/hr − consumable gold/hr.
+// Bottleneck = whichever material or consumable runs out first.
 import * as events from '../core/events.js';
 import * as settings from '../core/settings.js';
 import { data } from '../game/data.js';
 import * as util from '../core/util.js';
 import { getInsatiableHps } from './tomeDetector.js';
+import { getEquippedConsumables } from './consumables.js';
 
 export function initEstimator() {
-    events.on('page', update);
+    events.on('page', () => { lastSig = null; update(); });
     events.on('action-exp', update);
     events.on('action-inventory', update);
     events.on('action-loot', update);
@@ -15,192 +32,82 @@ export function initEstimator() {
     events.on('game-estimates', update);
     events.on('action-set-amount', update);
     events.on('levels', update);
+    events.on('user-data', update);
 }
+
+// Dedup signature — the readers poll once per second and each of the eight
+// emit events triggers update(). Without this, the panel rebuilds its Items
+// tab HTML up to eight times per visible second even when nothing changed,
+// which the user reads as values "constantly refreshing." We only re-emit
+// when the rounded display would actually look different.
+let lastSig = null;
 
 function update() {
     const page = events.last('page');
     if (!page || page.type !== 'action' || !data.ready) return;
-
-    const action = data.actions.byId[page.action];
-    const skill = data.skills.byId[page.skill];
+    // Route segments can be numeric IDs or technicalNames — resolve each via
+    // both indexes. data.skills.byTechnicalName has been around; we added
+    // data.actions.byTechnicalName in the same edit so Pine Tree style URLs
+    // (where rift-guild ships id: null and the URL might use "PineTree")
+    // still find the action.
+    const action = data.actions.byId[page.action]
+                || data.actions.byTechnicalName?.[page.actionRaw];
+    const skill = data.skills.byId[page.skill]
+               || data.skills.byTechnicalName?.[page.skillRaw];
     if (!action || !skill) return;
-
-    const estimation = calculate(page.skill, page.action);
-    if (estimation) {
-        events.emit('estimation', estimation);
-    }
+    const est = calculate(skill, action);
+    if (!est) return;
+    const sig = signatureOf(est);
+    if (sig === lastSig) return;
+    lastSig = sig;
+    events.emit('estimation', est);
 }
 
-function calculate(skillId, actionId) {
-    const action = data.actions.byId[actionId];
-    const skill = data.skills.byId[skillId];
-    const inventory = events.last('action-inventory') || {};
-    const ingredients = data.ingredients.byAction[actionId] || [];
-    const drops = data.drops.byAction[actionId] || [];
+function calculate(skill, action) {
+    const skillId = skill.id;
+    const actionId = action.id;
 
-    // --- Read game's own estimates ---
+    // Game's own per-hour numbers from the DOM Estimates tab.
     const gameEst = events.last('game-estimates');
-    const hasGameData = gameEst && gameEst.skill === skillId;
-
-    const actionsPerHour = hasGameData && gameEst.actionsPerHour > 0
+    const hasGame = gameEst && gameEst.skill === skillId;
+    const actionsPerHour = (hasGame && gameEst.actionsPerHour > 0)
         ? gameEst.actionsPerHour
         : (action.speed > 0 ? 3600 / action.speed : 0);
-
-    const xpPerHour = hasGameData && gameEst.xpPerHour > 0
+    if (!actionsPerHour) return null;
+    const xpPerHour = (hasGame && gameEst.xpPerHour > 0)
         ? gameEst.xpPerHour
-        : actionsPerHour * action.exp;
+        : actionsPerHour * (action.exp || 0);
 
-    if (!xpPerHour) return null;
+    // Drops, materials, consumables — three independent buckets that all
+    // contribute to bottleneck + profit.
+    const drops = computeDrops(actionId, actionsPerHour);
+    const materials = computeMaterials(actionId, actionsPerHour);
+    const consumables = computeConsumables(skill, actionsPerHour, gameEst, hasGame);
 
-    // --- Drop calculations ---
-    const dropDetails = [];
-    let dropGoldPerHour = 0;
-    for (const drop of drops) {
-        if (drop.type === 'FAILED' || drop.type === 'MONSTER') continue;
-        const perHour = ((1 + drop.amount) / 2) * drop.chance * actionsPerHour;
-        const item = data.items.byId[drop.item];
-        const sellPrice = item?.attributes?.MIN_MARKET_PRICE || item?.attributes?.SELL_PRICE || 0;
-        const goldPerHour = perHour * sellPrice;
-        dropGoldPerHour += goldPerHour;
-        dropDetails.push({ itemId: drop.item, perHour, sellPrice, goldPerHour });
-    }
+    // Profit
+    const dropGoldPerHour = sumGold(drops);
+    const materialGoldPerHour = sumGold(materials);
+    const consumableGoldPerHour = sumGold(consumables);
+    const profitPerHour = dropGoldPerHour - materialGoldPerHour - consumableGoldPerHour;
 
-    // --- Ingredient calculations ---
-    const ingredientDetails = [];
+    // Bottleneck = shortest runway across materials + consumables, with the
+    // set-amount remaining quota considered too. We only emit a bottleneck
+    // for actual items so the panel can label "X runs out first"; the set-
+    // amount case is signalled by finishedSeconds < Infinity + bottleneck=null.
+    const setAmount = events.last('action-set-amount');
     let finishedSeconds = Infinity;
-    let ingredientGoldPerHour = 0;
     let bottleneck = null;
-    for (const ing of ingredients) {
-        const perHour = ing.amount * actionsPerHour;
-        const stored = inventory[ing.item] || 0;
-        const secondsLeft = perHour > 0 ? (stored / perHour) * 3600 : Infinity;
-        const item = data.items.byId[ing.item];
-        const sellPrice = item?.attributes?.MIN_MARKET_PRICE || item?.attributes?.SELL_PRICE || 0;
-        const goldPerHour = perHour * sellPrice;
-        ingredientGoldPerHour += goldPerHour;
-        ingredientDetails.push({ itemId: ing.item, stored, perHour, secondsLeft, sellPrice, goldPerHour });
-        if (secondsLeft < finishedSeconds) {
-            finishedSeconds = secondsLeft;
-            // Track which ingredient is the bottleneck — first to run out.
-            // Only meaningful when secondsLeft is finite (i.e. stored > 0 OR
-            // we actually use this ingredient at all).
-            if (Number.isFinite(secondsLeft)) {
-                bottleneck = { itemId: ing.item, secondsLeft };
-            }
+    if (setAmount && setAmount.skill === skillId && setAmount.remaining > 0) {
+        finishedSeconds = (setAmount.remaining / actionsPerHour) * 3600;
+    }
+    for (const row of [...materials, ...consumables]) {
+        if (row.stored > 0 && row.secondsLeft < finishedSeconds) {
+            finishedSeconds = row.secondsLeft;
+            bottleneck = { itemId: row.itemId, secondsLeft: row.secondsLeft };
         }
     }
 
-    // --- Set amount limit ---
-    const setAmountData = events.last('action-set-amount');
-    if (setAmountData && setAmountData.skill === skillId && setAmountData.remaining != null && actionsPerHour > 0) {
-        const setAmountSeconds = (setAmountData.remaining / actionsPerHour) * 3600;
-        if (setAmountSeconds < finishedSeconds) {
-            finishedSeconds = setAmountSeconds;
-            bottleneck = null; // set-amount, not an ingredient
-        }
-    }
-
-    // --- Consumables card (sigil / potion / brew / food) ---
-    // Read straight from the in-game Consumables card on the skill page.
-    // Items split by attribute:
-    //   - DURATION (sigil / potion / brew, typically 180s = 20/hr)
-    //   - HEAL = food. Combat: consumed at damage rate. With Insatiable
-    //     Power Tome equipped, an extra HP/s is drained on every action
-    //     regardless of skill — config'd as 'insatiable-hps' (default 0,
-    //     user enters their tome's rate, e.g. 1.6 for T8).
-    // The shortest-lasting one wins the bottleneck tag.
-    const consumables = events.last('action-consumables') || {};
-    const damagePerHour = hasGameData ? (gameEst.damagePerHour || 0) : 0;
-    const foodPerHour = hasGameData ? (gameEst.foodPerHour || 0) : 0;
-    // Insatiable Power Tome HP/s drain. Auto-detected level × 0.2 (linear),
-    // only applied when the user has flipped the toggle on.
-    const insatiableHps = settings.getOnDefault('insatiable-tome-active') ? getInsatiableHps() : 0;
-    // Combat takes monster damage + insatiable; other skills only insatiable.
-    const insatiableHpPerHour = insatiableHps * 3600;
-    const effectiveHpPerHour = (skill.type === 'Combat' ? damagePerHour : 0) + insatiableHpPerHour;
-    // Find the main produced drop (used for the Mastery Contract cost calc).
-    const producedDrops = drops.filter(d => d.type !== 'FAILED' && d.type !== 'MONSTER');
-    const mainDrop = producedDrops.length
-        ? producedDrops.reduce((best, d) =>
-            (d.chance * (1 + d.amount)) > (best.chance * (1 + best.amount)) ? d : best
-        )
-        : null;
-    const mainDropItem = mainDrop ? data.items.byId[mainDrop.item] : null;
-    const mainDropPrice = mainDropItem
-        ? (mainDropItem.attributes?.MIN_MARKET_PRICE || mainDropItem.attributes?.SELL_PRICE || 0)
-        : 0;
-
-    for (const [key, raw] of Object.entries(consumables)) {
-        // Unpack — values can be a plain number (count) or an object with
-        // extra metadata (Mastery Contract emits { count, active }).
-        const count = typeof raw === 'object' ? raw.count : raw;
-        const meta  = typeof raw === 'object' ? raw : {};
-
-        // Resolve the item. 'brew' is synthetic — we treat it as a 180s
-        // sigil-class item with its own image, since it isn't in the DB.
-        const isBrew = key === 'brew';
-        const item = isBrew
-            ? { id: 'brew', name: 'Brew', image: 'misc/brew.png', attributes: { DURATION: 180 } }
-            : data.items.byId[+key];
-        if (!item) continue;
-
-        const duration = item.attributes?.DURATION;
-        const heal = item.attributes?.HEAL;
-        const isContract = item.id === 1041;
-        if (!duration && !heal && !isContract) continue;
-
-        let perHour = 0;
-        let secondsLeft = Infinity;
-        let sellPrice = item.attributes?.MIN_MARKET_PRICE || item.attributes?.SELL_PRICE || 0;
-        let goldPerHour = 0;
-
-        if (count > 0) {
-            if (isContract) {
-                if (meta.active && actionsPerHour > 0) {
-                    perHour = actionsPerHour;
-                    secondsLeft = (count / actionsPerHour) * 3600;
-                    // Cost = market price of the main produced item (the
-                    // contract creates + contributes one to mastery per
-                    // action, so the displayed loss equals that item's
-                    // market value, not the contract's own price).
-                    sellPrice = mainDropPrice;
-                    goldPerHour = perHour * sellPrice;
-                }
-            } else if (duration) {
-                perHour = 3600 / duration;
-                secondsLeft = count * duration;
-                goldPerHour = perHour * sellPrice;
-            } else if (heal) {
-                // Prefer the game's own Food/hr if it's reporting one.
-                // Otherwise derive from effective HP drain (monster damage on
-                // combat + Insatiable tome on every skill) divided by the
-                // food's heal value. Non-combat with no tome → 0 → no lasts.
-                perHour = foodPerHour > 0
-                    ? foodPerHour
-                    : (effectiveHpPerHour > 0 ? effectiveHpPerHour / heal : 0);
-                secondsLeft = perHour > 0 ? (count / perHour) * 3600 : Infinity;
-                goldPerHour = perHour * sellPrice;
-            }
-        }
-
-        ingredientDetails.push({
-            itemId: isBrew ? 'brew' : item.id,
-            stored: count,
-            perHour, secondsLeft, sellPrice, goldPerHour,
-            synthetic: isBrew ? { name: 'Brew', image: 'misc/brew.png' } : null,
-            contract: isContract ? { active: !!meta.active } : null,
-        });
-        // Only consider as bottleneck when there's actually stock to run out.
-        if (count > 0 && secondsLeft < finishedSeconds) {
-            finishedSeconds = secondsLeft;
-            bottleneck = { itemId: isBrew ? 'brew' : item.id, secondsLeft };
-        }
-    }
-
-    // --- Profit ---
-    const profitPerHour = dropGoldPerHour - ingredientGoldPerHour;
-
-    // --- Exp state for level/tier/goal ---
+    // Skill exp state for level / tier countdowns.
     const actionExp = events.last('action-exp');
     const levels = events.last('levels');
     let currentExp = 0;
@@ -212,49 +119,155 @@ function calculate(skillId, actionId) {
         currentLevel = levels[skillId].level;
         currentExp = util.levelToExp(currentLevel);
     }
-
-    // --- Time to level / tier ---
     const levelUpExp = util.expToNextLevel(currentExp);
     const tierUpExp = currentLevel >= 100 ? 0 : util.expToNextTier(currentExp);
     const levelUpSeconds = xpPerHour > 0 ? (levelUpExp / xpPerHour) * 3600 : Infinity;
     const tierUpSeconds = tierUpExp > 0 && xpPerHour > 0 ? (tierUpExp / xpPerHour) * 3600 : 0;
 
-    const loot = events.last('action-loot') || {};
-
     return {
-        skillId,
-        actionId,
+        skillId, actionId,
         skillName: skill.displayName,
         actionName: action.name,
-        actionsPerHour,
-        xpPerHour,
-        currentExp,
-        currentLevel,
+        actionsPerHour, xpPerHour,
+        currentExp, currentLevel,
         levelUpSeconds,
-        levelUpActions: actionsPerHour > 0 ? Math.ceil(levelUpSeconds / 3600 * actionsPerHour) : 0,
+        levelUpActions: Math.ceil(levelUpSeconds / 3600 * actionsPerHour),
         tierUpSeconds,
-        tierUpActions: actionsPerHour > 0 ? Math.ceil(tierUpSeconds / 3600 * actionsPerHour) : 0,
+        tierUpActions: tierUpSeconds > 0 ? Math.ceil(tierUpSeconds / 3600 * actionsPerHour) : 0,
         isActive: !!events.last('action-active'),
         finishedSeconds,
         bottleneck,
-        ingredients: ingredientDetails,
-        drops: dropDetails,
-        loot,
+        drops,
+        // The panel renders both materials and consumables out of `ingredients`
+        // — combining them here keeps the existing UI working unchanged.
+        ingredients: [...materials, ...consumables],
+        loot: events.last('action-loot') || {},
         dropGoldPerHour,
-        ingredientGoldPerHour,
+        ingredientGoldPerHour: materialGoldPerHour + consumableGoldPerHour,
         profitPerHour,
     };
 }
 
-// Compute goal level time
+// Produced loot. Chance is already in [0,1] (adapter normalised the rift-
+// guild 0–1000 raw); amount is exact yield per success. So per-hour is
+// amount × chance × actions/hr. FAILED/MONSTER drops are skipped — they're
+// not produced output, just downstream tags.
+function computeDrops(actionId, actionsPerHour) {
+    const list = data.drops.byAction[actionId] || [];
+    const out = [];
+    for (const d of list) {
+        if (d.type === 'FAILED' || d.type === 'MONSTER') continue;
+        if (d.item == null) continue;
+        const item = data.items.byId[d.item];
+        if (!item) continue;
+        const perHour = (d.amount || 1) * (d.chance || 0) * actionsPerHour;
+        const sellPrice = priceOf(item);
+        out.push({
+            itemId: d.item, perHour, sellPrice,
+            goldPerHour: perHour * sellPrice,
+        });
+    }
+    return out;
+}
+
+// Recipe inputs — what the action consumes from the player's bag. Counted
+// against the bag stock the DOM Materials card surfaces.
+function computeMaterials(actionId, actionsPerHour) {
+    const ings = data.ingredients.byAction[actionId] || [];
+    const inv = events.last('action-inventory') || {};
+    const out = [];
+    for (const ing of ings) {
+        const item = data.items.byId[ing.item];
+        if (!item) continue;
+        const perHour = (ing.amount || 1) * actionsPerHour;
+        const stored = +(inv[ing.item] || 0);
+        const sellPrice = priceOf(item);
+        out.push({
+            itemId: ing.item, stored, perHour, sellPrice,
+            secondsLeft: perHour > 0 ? (stored / perHour) * 3600 : Infinity,
+            goldPerHour: perHour * sellPrice,
+        });
+    }
+    return out;
+}
+
+// Equipped consumables — food, sigil, potion, brew. Mastery Contract is
+// intentionally excluded by consumables.js (see file header).
+function computeConsumables(skill, actionsPerHour, gameEst, hasGame) {
+    const damagePerHour = hasGame ? (gameEst.damagePerHour || 0) : 0;
+    const foodPerHour = hasGame ? (gameEst.foodPerHour || 0) : 0;
+    const insatiableHps = settings.getOnDefault('insatiable-tome-active') ? getInsatiableHps() : 0;
+    const isCombat = skill.type === 'Combat';
+    // Combat takes monster damage + insatiable drain, gathering/crafting just
+    // the insatiable drain (and only when the player has it active).
+    const effectiveHpPerHour = (isCombat ? damagePerHour : 0) + insatiableHps * 3600;
+
+    const out = [];
+    for (const c of getEquippedConsumables()) {
+        const { itemId, item, role, count } = c;
+        const sellPrice = priceOf(item);
+        let perHour = 0;
+        if (role === 'buff') {
+            // Sigils, potions, brews tick on a 180s window → 20/hr.
+            const duration = item.attributes?.DURATION || 180;
+            perHour = 3600 / duration;
+        } else if (role === 'food') {
+            // Game's foodPerHour wins when reported (matches the in-game UI);
+            // otherwise derive from HP drain ÷ heal value. Result is 0 when
+            // nothing is draining HP — food never runs out on a non-combat
+            // skill without the Insatiable tome, which is correct.
+            const heal = item.attributes?.HEAL || 0;
+            perHour = foodPerHour > 0
+                ? foodPerHour
+                : (effectiveHpPerHour > 0 && heal > 0 ? effectiveHpPerHour / heal : 0);
+        }
+        const secondsLeft = perHour > 0 && count > 0 ? (count / perHour) * 3600 : Infinity;
+        out.push({
+            itemId, stored: count, perHour, sellPrice, secondsLeft,
+            goldPerHour: perHour * sellPrice,
+        });
+    }
+    return out;
+}
+
+function priceOf(item) {
+    return item?.attributes?.MIN_MARKET_PRICE
+        || item?.attributes?.SELL_PRICE
+        || 0;
+}
+
+function sumGold(rows) {
+    let s = 0;
+    for (const r of rows) s += r.goldPerHour || 0;
+    return s;
+}
+
+function signatureOf(est) {
+    return [
+        Math.round(est.xpPerHour),
+        Math.round(est.actionsPerHour),
+        Math.round(est.profitPerHour),
+        Math.round(est.dropGoldPerHour),
+        Math.round(est.ingredientGoldPerHour),
+        Number.isFinite(est.finishedSeconds) ? Math.floor(est.finishedSeconds / 60) : 'inf',
+        Number.isFinite(est.levelUpSeconds) ? Math.floor(est.levelUpSeconds / 60) : 'inf',
+        est.currentExp,
+        est.currentLevel,
+        est.isActive ? 1 : 0,
+        est.bottleneck?.itemId ?? '',
+        est.drops.map(d => `${d.itemId}:${Math.round(d.perHour)}:${Math.round(d.goldPerHour)}`).join('|'),
+        est.ingredients.map(i =>
+            `${i.itemId}:${Math.round(i.perHour)}:${i.stored}:${Math.round(i.goldPerHour)}`
+        ).join('|'),
+        Object.entries(est.loot).map(([k, v]) => `${k}:${v}`).join('|'),
+    ].join('#');
+}
+
 export function calcGoalTime(goalLevel) {
     const est = events.last('estimation');
     if (!est || !est.xpPerHour) return null;
     const goalExp = util.expToGoalLevel(est.currentExp, goalLevel);
     if (goalExp <= 0) return { seconds: 0, actions: 0 };
     const seconds = (goalExp / est.xpPerHour) * 3600;
-    return {
-        seconds,
-        actions: Math.ceil(seconds / 3600 * est.actionsPerHour),
-    };
+    return { seconds, actions: Math.ceil(seconds / 3600 * est.actionsPerHour) };
 }
