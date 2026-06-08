@@ -954,7 +954,20 @@ function getMarketSearchValue() {
 function setMarketSearch(value) {
     const $input = $('market-listings-component .search > input');
     if (!$input.length) return;
-    $input.val(value);
+    if (value === '') {
+        // Use the native HTMLInputElement value setter only for the clear
+        // case. A plain $input.val('') is silently reverted by Angular's
+        // ngModel — leaving any stale prior search active. A stuck search
+        // intersected with the tribute matcher produced seemingly-broken
+        // reports ("only logs in Forest, nothing in Ocean"). Empty string
+        // is also safe to push through the native setter — no regex
+        // content to crash the game's filter the way long type/tribute
+        // regexes would (see v1.6.12 revert).
+        const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        nativeSetter.call($input[0], '');
+    } else {
+        $input.val(value);
+    }
     $input[0].dispatchEvent(new Event('input', { bubbles: true }));
 }
 
