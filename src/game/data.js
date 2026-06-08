@@ -353,6 +353,13 @@ function processRawData(raw) {
     const allIngredients = [];
     const toFrac = c => (c == null ? 0 : c / 1000);
 
+    // Charcoal is consumed per action by Cooking and Smelting (1–8 by tier),
+    // exposed by the API as a top-level `charcoal` field on the action rather
+    // than as a materials[] entry. We splice it in as a synthetic ingredient
+    // so the estimator counts it toward bottleneck + gold cost like any other
+    // input. ID is looked up dynamically; fall back to 2 (current item ID).
+    const charcoalId = items.find(i => i.technicalName === 'Charcoal')?.id ?? 2;
+
     function actionIdOf(a) {
         if (a.id != null) return parseId(a.id);
         const bf = ID_BACKFILL.action[a.technicalName];
@@ -391,6 +398,9 @@ function processRawData(raw) {
         }
         for (const m of (a.materials || [])) {
             allIngredients.push({ action: aid, item: parseId(m.id), amount: m.amount });
+        }
+        if (a.charcoal) {
+            allIngredients.push({ action: aid, item: charcoalId, amount: a.charcoal });
         }
     }
 
