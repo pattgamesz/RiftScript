@@ -355,7 +355,11 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.6.10 — Skill calculator polish: charcoal cost + gold-first layout</div>
+                                <div class="rs-changelog-section">v1.6.11 — Tribute filter fix: actually clear the game's search box</div>
+                                <ul>
+                                    <li><b>Selecting a Tribute filter (Forest / Mountain / Ocean) now reliably clears the game's search input.</b> Previously, if you'd typed something in the game's search box before clicking a tribute, Angular silently rolled back our attempt to clear it — the stale search stayed active and intersected with the tribute matcher. Reported symptom: <i>"only logs visible in Forest, nothing visible in Ocean"</i> (the stuck word was "Log"). Fix uses the native <code>HTMLInputElement</code> value setter so Angular sees the clear as real user input and doesn't revert it.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.6.10 — Skill calculator polish: charcoal cost + gold-first layout</div>
                                 <ul>
                                     <li><b>Charcoal now counted as a per-action material</b> — every Cooking action (raw fish + pies) and every Smelting bar consumes 1–8 charcoal per action depending on tier. The skill calculator now includes that cost in materials gold/hr and counts charcoal toward the bottleneck "runs out first" detection. Charcoal price is pulled from the same market value the Charcoal filter shows.</li>
                                     <li><b>Gold/hr promoted to the primary line</b> on every Produced + Consumed row, with the units/hr dropping to the muted line below. Costs stay red. Easier to read the row at a glance when you're deciding which action is actually profitable.</li>
