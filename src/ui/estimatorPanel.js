@@ -414,7 +414,6 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
             <span class="rs-value rs-item-value">
                 ${primaryLine}
                 ${perHourExtra}
-                <span class="rs-extra">${formatNumber(d.stored)} stored</span>
                 <span class="rs-extra">${lastsLine}</span>
             </span>
         </div>
