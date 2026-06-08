@@ -449,6 +449,24 @@ function getTributeMatchingItems(tributeKey) {
     return data.items.list.filter(i => tribute.match(i));
 }
 
+// Mountain has 160+ matching items — too many to feed into the game's
+// search as explicit alternatives without the filter choking. Every
+// non-bone Mountain item starts with one of the 8 metal tier names
+// (Copper Helmet, Iron Bar, Astral Crystal, …), so a single tier-prefix
+// pattern + the explicit bone list catches them all in ~165 chars.
+// Arrows and Chests share the tier prefix — they over-match here but get
+// hidden client-side by TRIBUTES.Mountain.match in applyToListings.
+const MOUNTAIN_GAME_SEARCH =
+    '^(Copper|Iron|Silver|Gold|Cobalt|Obsidian|Astral|Infernal) ' +
+    '|^(Bone|Bone Piece|Fang|Medium Bone|Medium Fang|Large Bone|Large Fang|Giant Bone|Giant Fang)$';
+
+function buildTributeSearch(tributeKey) {
+    if (tributeKey === 'Mountain') return MOUNTAIN_GAME_SEARCH;
+    const items = getTributeMatchingItems(tributeKey);
+    if (!items?.length) return '';
+    return items.map(i => i.name).filter(Boolean).map(n => `^${escapeRegex(n)}`).join('|');
+}
+
 // ─── Panel ──────────────────────────────────────────────────
 
 function ensurePanel() {
@@ -736,14 +754,16 @@ function applyFilter(patch) {
     Object.assign(currentFilter, patch);
     writeJSON(CURRENT_KEY, currentFilter);
 
-    // Update the in-game search box to match the active filter. Tributes
-    // skip the regex injection — Mountain alone has ~160 alternatives
-    // (smithed gear + bars + ore + crystals + bones), and switching
-    // between tributes with strings that long crashes the game's filter.
-    // The client-side matcher in applyToListings + valuator chips keep
-    // the visual behaviour intact without poking the game's filter.
+    // Update the in-game search box to match the active filter. For Forest
+    // and Ocean we type in an explicit name list (~70 items each, well under
+    // the limit the Metal Parts type already proves safe). Mountain has
+    // 160+ explicit alternatives — historically crashed the game's filter —
+    // so it uses a compact tier-prefix pattern instead (Arrows/Chests sneak
+    // through but applyToListings hides them client-side via the predicate).
+    // The narrower game-filtered pool means far fewer DOM listings for us
+    // to walk, which is the real cost when matchers fire on every poll.
     if (currentFilter.tribute && TRIBUTES[currentFilter.tribute]) {
-        setMarketSearch('');
+        setMarketSearch(buildTributeSearch(currentFilter.tribute));
     } else if (currentFilter.type && currentFilter.type !== 'None') {
         const items = getTypeMatchingItems(currentFilter.type);
         if (items?.length) {
