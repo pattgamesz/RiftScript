@@ -355,7 +355,13 @@ function renderChangelogCard() {
         <div class="rs-card">
             <div class="rs-card-header">Changelog</div>
             <div class="rs-changelog">
-                                <div class="rs-changelog-section">v1.6.6 — Market filter rewrite + hybrid game-data API</div>
+                                <div class="rs-changelog-section">v1.6.10 — Skill calculator polish: charcoal cost + gold-first layout</div>
+                                <ul>
+                                    <li><b>Charcoal now counted as a per-action material</b> — every Cooking action (raw fish + pies) and every Smelting bar consumes 1–8 charcoal per action depending on tier. The skill calculator now includes that cost in materials gold/hr and counts charcoal toward the bottleneck "runs out first" detection. Charcoal price is pulled from the same market value the Charcoal filter shows.</li>
+                                    <li><b>Gold/hr promoted to the primary line</b> on every Produced + Consumed row, with the units/hr dropping to the muted line below. Costs stay red. Easier to read the row at a glance when you're deciding which action is actually profitable.</li>
+                                    <li><b>Dropped the redundant "X stored" line</b> from consumed rows — the game's own Materials card right next to the calculator already shows it.</li>
+                                </ul>
+                                <div class="rs-changelog-section" style="margin-top:16px;padding-top:12px;border-top:1px solid #2a3a50">v1.6.6 — Market filter rewrite + hybrid game-data API</div>
                                 <ul>
                                     <li><b>Best-deal market filters revamped</b> — each preset (Food, Charcoal, Compost, Arcane Powder, Pet Snacks, Metal Parts, Sigil Pieces, Research Points, Potion Mix) now sorts by the metric that actually matters: gold per HP, gold per coal, gold per compost, etc. Each row shows the per-item yield + the cost efficiency with a colour threshold.</li>
                                     <li><b>Tribute filters</b> (Forest / Mountain / Ocean) use the API's <code>price</code> as the per-item tribute weight. Listings sorted by listing price ÷ tribute value — lower is a better deal per tribute point.</li>
