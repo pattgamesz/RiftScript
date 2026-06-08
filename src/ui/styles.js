@@ -106,9 +106,10 @@ const CSS = `
     color: rgba(255,255,255,0.4);
     font-weight: 400;
 }
-/* Per-row cost line on consumed items — slightly brighter so the cost
- * stands out next to the muted stored/lasts info. */
-.rs-extra.rs-cost {
+/* Per-row cost line on consumed items — red so cost stands out. Applies
+ * to both the primary line (gold/hr promoted to the top) and any extra
+ * cost lines that still inherit .rs-extra sizing. */
+.rs-cost {
     color: rgba(248, 113, 113, 0.85);
 }
 

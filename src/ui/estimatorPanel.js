@@ -345,8 +345,8 @@ function itemRow(itemId, perHour, price, goldPerHour) {
             <span class="rs-label">${name}</span>
             <span class="rs-mid"><input type="number" class="rs-price-input" data-item="${itemId}" value="${Math.round(price)}" min="0" /></span>
             <span class="rs-value rs-item-value">
-                <span>${formatNumber(perHour)} / hr</span>
-                <span class="rs-extra">${formatNumber(goldPerHour)} gold / hr</span>
+                <span>${formatNumber(goldPerHour)} gold / hr</span>
+                <span class="rs-extra">${formatNumber(perHour)} / hr</span>
             </span>
         </div>
     `;
@@ -397,8 +397,14 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
             ? ` <span class="rs-tome-tag">ON</span>`
             : ` <span class="rs-tome-tag rs-tome-tag-off">OFF</span>`;
     }
-    const goldLine = goldPerHour > 0
-        ? `<span class="rs-extra rs-cost">- ${formatNumber(goldPerHour)} gold / hr</span>`
+    // Promote gold/hr to the primary line; if there's no cost (e.g. an
+     // untracked synthetic), fall back to the per-hour line so the row still
+     // has a top value.
+    const primaryLine = goldPerHour > 0
+        ? `<span class="rs-cost">- ${formatNumber(goldPerHour)} gold / hr</span>`
+        : `<span>${perHourLine}</span>`;
+    const perHourExtra = goldPerHour > 0 && d.perHour > 0
+        ? `<span class="rs-extra">${formatNumber(d.perHour)} / hr</span>`
         : '';
     return `
         <div class="rs-row${isBottleneck ? ' rs-bottleneck' : ''}">
@@ -406,8 +412,8 @@ function ingredientRow(d, price, goldPerHour, isBottleneck) {
             <span class="rs-label">${name}${nameSuffix}</span>
             <span class="rs-mid"><input type="number" class="rs-price-input" data-item="${d.itemId}" value="${Math.round(price)}" min="0" /></span>
             <span class="rs-value rs-item-value">
-                <span>${perHourLine}</span>
-                ${goldLine}
+                ${primaryLine}
+                ${perHourExtra}
                 <span class="rs-extra">${formatNumber(d.stored)} stored</span>
                 <span class="rs-extra">${lastsLine}</span>
             </span>
