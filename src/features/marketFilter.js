@@ -972,10 +972,18 @@ function getMarketSearchValue() {
 }
 
 function setMarketSearch(value) {
-    const $input = $('market-listings-component .search > input');
-    if (!$input.length) return;
-    $input.val(value);
-    $input[0].dispatchEvent(new Event('input', { bubbles: true }));
+    const input = document.querySelector('market-listings-component .search > input');
+    if (!input) return;
+    // Angular's two-way binding intercepts the `value` property on the
+    // input element — a plain $input.val(value) updates the DOM, fires our
+    // input event, but the model write-back rolls the DOM value to whatever
+    // Angular thinks it should be on the next change-detection tick. Result:
+    // game's filter doesn't apply (listings count unchanged) and the typed
+    // text flashes away. The native-prototype value setter bypasses the
+    // framework getter so the value sticks both visually and in the model.
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    nativeSetter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function readJSON(key, fallback) {
