@@ -449,23 +449,6 @@ function getTributeMatchingItems(tributeKey) {
     return data.items.list.filter(i => tribute.match(i));
 }
 
-// Mountain has 160+ matching items — too many to feed into the game's
-// search as explicit alternatives without the filter choking. Every
-// non-bone Mountain item starts with one of the 8 metal tier names
-// (Copper Helmet, Iron Bar, Astral Crystal, …), so a single tier-prefix
-// pattern + the explicit bone list catches them all in ~165 chars.
-// Arrows and Chests share the tier prefix — they over-match here but get
-// hidden client-side by TRIBUTES.Mountain.match in applyToListings.
-const MOUNTAIN_GAME_SEARCH =
-    '^(Copper|Iron|Silver|Gold|Cobalt|Obsidian|Astral|Infernal) ' +
-    '|^(Bone|Bone Piece|Fang|Medium Bone|Medium Fang|Large Bone|Large Fang|Giant Bone|Giant Fang)$';
-
-function buildTributeSearch(tributeKey) {
-    if (tributeKey === 'Mountain') return MOUNTAIN_GAME_SEARCH;
-    const items = getTributeMatchingItems(tributeKey);
-    if (!items?.length) return '';
-    return items.map(i => i.name).filter(Boolean).map(n => `^${escapeRegex(n)}`).join('|');
-}
 
 // ─── Panel ──────────────────────────────────────────────────
 
@@ -754,16 +737,13 @@ function applyFilter(patch) {
     Object.assign(currentFilter, patch);
     writeJSON(CURRENT_KEY, currentFilter);
 
-    // Update the in-game search box to match the active filter. For Forest
-    // and Ocean we type in an explicit name list (~70 items each, well under
-    // the limit the Metal Parts type already proves safe). Mountain has
-    // 160+ explicit alternatives — historically crashed the game's filter —
-    // so it uses a compact tier-prefix pattern instead (Arrows/Chests sneak
-    // through but applyToListings hides them client-side via the predicate).
-    // The narrower game-filtered pool means far fewer DOM listings for us
-    // to walk, which is the real cost when matchers fire on every poll.
+    // Update the in-game search box to match the active filter. Tributes
+    // skip the regex injection — Mountain (~160 alternatives) crashes the
+    // game's filter on switch, and Ocean's ~1000-char regex of explicit
+    // names empties the listings entirely. v1.6.12 tried both and both
+    // re-broke (see commit history). Client-side hide is the safe path.
     if (currentFilter.tribute && TRIBUTES[currentFilter.tribute]) {
-        setMarketSearch(buildTributeSearch(currentFilter.tribute));
+        setMarketSearch('');
     } else if (currentFilter.type && currentFilter.type !== 'None') {
         const items = getTypeMatchingItems(currentFilter.type);
         if (items?.length) {
@@ -972,18 +952,10 @@ function getMarketSearchValue() {
 }
 
 function setMarketSearch(value) {
-    const input = document.querySelector('market-listings-component .search > input');
-    if (!input) return;
-    // Angular's two-way binding intercepts the `value` property on the
-    // input element — a plain $input.val(value) updates the DOM, fires our
-    // input event, but the model write-back rolls the DOM value to whatever
-    // Angular thinks it should be on the next change-detection tick. Result:
-    // game's filter doesn't apply (listings count unchanged) and the typed
-    // text flashes away. The native-prototype value setter bypasses the
-    // framework getter so the value sticks both visually and in the model.
-    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-    nativeSetter.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const $input = $('market-listings-component .search > input');
+    if (!$input.length) return;
+    $input.val(value);
+    $input[0].dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function readJSON(key, fallback) {
